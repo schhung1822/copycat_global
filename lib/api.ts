@@ -38,7 +38,7 @@ export class ApiError extends Error {
     this.details = details;
   }
 
-  /** Hết điểm — dùng để hiện nút "Nạp thêm" thay vì báo lỗi chung chung. */
+  /** Hết điểm — dùng để hiện nút "Buy credits" thay vì báo lỗi chung chung. */
   get isInsufficientTokens(): boolean {
     return this.code === 'insufficient_tokens';
   }
@@ -62,7 +62,7 @@ async function request<T>(method: Method, path: string, body?: unknown): Promise
       body: body === undefined ? undefined : JSON.stringify(body),
     });
   } catch {
-    throw new ApiError(0, 'Không kết nối được máy chủ. Kiểm tra lại kết nối mạng hoặc server đã chạy chưa.', 'network');
+    throw new ApiError(0, 'Could not reach the server. Check your internet connection and try again.', 'network');
   }
 
   if (response.status === 204) return undefined as T;
@@ -80,7 +80,7 @@ async function request<T>(method: Method, path: string, body?: unknown): Promise
   if (!response.ok) {
     throw new ApiError(
       response.status,
-      data?.error ?? `Lỗi máy chủ (${response.status}).`,
+      data?.error ?? `Server error (${response.status}).`,
       data?.code ?? 'error',
       data?.details,
     );

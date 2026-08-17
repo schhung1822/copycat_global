@@ -5,6 +5,7 @@ import { Alert, Card, EmptyState, PageLoader, StatCard, TableWrap } from '../com
 import { useAuth } from '../context/AuthContext';
 import { api, qs } from '../lib/api';
 import { BUCKET_LABEL, formatDateTime, formatNumber, TX_TYPE_LABEL } from '../lib/format';
+import { CREDITS } from '../lib/routes';
 import type { TokenTransaction, WalletSummary } from '../types';
 
 const PAGE_SIZE = 30;
@@ -42,11 +43,11 @@ export const WalletPage: React.FC = () => {
     <div className="max-w-5xl mx-auto p-6 space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-100">Ví điểm</h1>
-          <p className="text-sm text-gray-500 mt-1">Toàn bộ biến động điểm của tài khoản.</p>
+          <h1 className="text-2xl font-bold text-gray-100">Credits</h1>
+          <p className="text-sm text-gray-500 mt-1">Every credit that has entered or left your account.</p>
         </div>
-        <Link to="/nap-tien">
-          <Button className="!rounded-xl !py-2.5">Mua thêm điểm</Button>
+        <Link to={CREDITS}>
+          <Button className="!rounded-xl !py-2.5">Buy credits</Button>
         </Link>
       </div>
 
@@ -57,62 +58,63 @@ export const WalletPage: React.FC = () => {
       */}
       {summary.isSubscribed && (
         <Card className="p-5">
-          <p className="text-[11px] uppercase tracking-wider text-gray-500 font-bold">Gói tháng (đã ngừng bán)</p>
-          <p className="text-gray-100 font-semibold mt-1">{summary.subscriptionName ?? 'Đang hoạt động'}</p>
+          <p className="text-[11px] uppercase tracking-wider text-gray-500 font-bold">Monthly plan (no longer sold)</p>
+          <p className="text-gray-100 font-semibold mt-1">{summary.subscriptionName ?? 'Active'}</p>
           <p className="text-[11px] text-gray-500 mt-0.5">
-            Còn hiệu lực tới {formatDateTime(summary.subscriptionExpiresAt)}. Sau mốc này, phần hạn mức tháng dừng lại;
-            điểm bạn mua vẫn dùng bình thường.
+            Valid until {formatDateTime(summary.subscriptionExpiresAt)}. After that the monthly allowance stops; credits
+            you bought keep working as usual.
           </p>
         </Card>
       )}
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Điểm khả dụng" value={formatNumber(summary.tokenBalance)} sub="dùng được ngay" />
+        <StatCard label="Available" value={formatNumber(summary.tokenBalance)} sub="ready to use" />
         <StatCard
-          label={summary.isSubscribed ? 'Trong đó: hạn mức tháng' : 'Điểm đã mua'}
+          label={summary.isSubscribed ? 'Of that: monthly allowance' : 'Purchased credits'}
           value={formatNumber(summary.isSubscribed ? summary.monthlyTokens : summary.purchasedTokens)}
           sub={
             summary.isSubscribed
-              ? `trên ${formatNumber(summary.monthlyAllowance)} · cấp lại ${formatDateTime(summary.monthlyPeriodEnd)}`
-              : 'không hết hạn'
+              ? `of ${formatNumber(summary.monthlyAllowance)} · resets ${formatDateTime(summary.monthlyPeriodEnd)}`
+              : 'never expire'
           }
         />
-        <StatCard label="Đã sử dụng" value={formatNumber(summary.totalTokensOut)} sub="điểm" />
+        <StatCard label="Spent" value={formatNumber(summary.totalTokensOut)} sub="credits" />
         <StatCard
-          label="Ảnh đã tạo"
+          label="Images created"
           value={formatNumber(summary.successImages)}
-          sub={`trên tổng ${formatNumber(summary.totalImages)} lượt`}
+          sub={`out of ${formatNumber(summary.totalImages)} attempts`}
         />
       </div>
 
       <Alert tone="info">
         {summary.isSubscribed ? (
           <>
-            Khi tạo ảnh, hệ thống <strong>trừ hạn mức tháng trước</strong>, hết mới dùng tới điểm đã mua. Hạn mức tháng
-            không dùng hết sẽ <strong>không được cộng dồn</strong> sang chu kỳ sau; điểm đã mua thì không hết hạn.
+            Generating an image <strong>spends your monthly allowance first</strong>, then falls back to purchased
+            credits. Unused allowance <strong>does not roll over</strong> to the next cycle; purchased credits never
+            expire.
           </>
         ) : (
           <>
-            Điểm đã mua <strong>không hết hạn</strong> — dùng tới đâu trừ tới đó. Ảnh lỗi được hoàn điểm tự động và ghi
-            rõ trong sao kê bên dưới.
+            Purchased credits <strong>never expire</strong> — you only pay for what you use. Failed images are refunded
+            automatically, and each refund shows up in the ledger below.
           </>
         )}
       </Alert>
 
       <Card className="p-4">
-        <h2 className="font-bold text-gray-100 mb-3">Sao kê</h2>
+        <h2 className="font-bold text-gray-100 mb-3">Ledger</h2>
         {transactions.length === 0 ? (
-          <EmptyState title="Chưa có biến động nào." />
+          <EmptyState title="Nothing here yet." />
         ) : (
           <TableWrap>
             <thead>
               <tr className="text-[11px] uppercase tracking-wider text-gray-500 border-b border-dark-800">
-                <th className="text-left font-bold py-2">Thời gian</th>
-                <th className="text-left font-bold py-2">Loại</th>
-                <th className="text-left font-bold py-2">Nguồn</th>
-                <th className="text-left font-bold py-2">Diễn giải</th>
-                <th className="text-right font-bold py-2">Điểm</th>
-                <th className="text-right font-bold py-2">Số dư sau</th>
+                <th className="text-left font-bold py-2">Date</th>
+                <th className="text-left font-bold py-2">Type</th>
+                <th className="text-left font-bold py-2">Source</th>
+                <th className="text-left font-bold py-2">Details</th>
+                <th className="text-right font-bold py-2">Credits</th>
+                <th className="text-right font-bold py-2">Balance</th>
               </tr>
             </thead>
             <tbody>
@@ -150,17 +152,17 @@ export const WalletPage: React.FC = () => {
               disabled={page === 1}
               className="px-3 py-1.5 rounded-lg bg-dark-850 text-gray-300 text-sm disabled:opacity-30"
             >
-              ← Trước
+              ← Previous
             </button>
             <span className="text-sm text-gray-500">
-              Trang {page} / {totalPages}
+              Page {page} of {totalPages}
             </span>
             <button
               onClick={() => setPage((p) => Math.min(p + 1, totalPages))}
               disabled={page >= totalPages}
               className="px-3 py-1.5 rounded-lg bg-dark-850 text-gray-300 text-sm disabled:opacity-30"
             >
-              Sau →
+              Next →
             </button>
           </div>
         )}

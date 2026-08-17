@@ -91,8 +91,8 @@ export interface CreateGenerationInput {
 
 export async function getActiveModel(code: string): Promise<ModelPricingRow> {
   const model = await queryOne<ModelPricingRow>('SELECT * FROM model_pricing WHERE code = ?', [code]);
-  if (!model) throw badRequest(`Không tìm thấy model "${code}".`, 'unknown_model');
-  if (!model.is_active) throw badRequest(`Model "${model.label}" đang tạm ngưng.`, 'model_inactive');
+  if (!model) throw badRequest(`Unknown model "${code}".`, 'unknown_model');
+  if (!model.is_active) throw badRequest(`"${model.label}" is temporarily unavailable.`, 'model_inactive');
   return model;
 }
 
@@ -112,14 +112,14 @@ export async function createGenerations(
   if (!provider.isConfigured()) {
     // Chi tiết ra log cho quản trị viên, khách chỉ thấy câu ngắn gọn.
     console.error(`[generation] Nhà cung cấp "${model.provider}" chưa được cấu hình API key.`);
-    throw new AppError(503, 'Hệ thống chưa sẵn sàng tạo ảnh. Vui lòng liên hệ quản trị viên.', 'provider_not_configured');
+    throw new AppError(503, 'Image generation is not available yet. Please contact support.', 'provider_not_configured');
   }
 
   const quantity = Math.min(Math.max(Math.trunc(input.quantityPerReference) || 1, 1), MAX_QUANTITY_PER_REFERENCE);
   const references = input.referenceImages.slice(0, MAX_REFERENCE_IMAGES);
   const products = input.productImages.slice(0, MAX_PRODUCT_IMAGES);
 
-  if (products.length === 0) throw badRequest('Cần ít nhất một ảnh sản phẩm.');
+  if (products.length === 0) throw badRequest('Add at least one product photo.');
 
   const aspectRatio = VALID_RATIOS.includes(input.aspectRatio) ? input.aspectRatio : 'auto';
   const jobCount = Math.max(references.length, 1) * quantity;
@@ -140,7 +140,7 @@ export async function createGenerations(
   );
   if ((inQueue?.total ?? 0) + jobCount > env.maxQueuePerUser) {
     throw badRequest(
-      `Bạn đang có quá nhiều ảnh trong hàng đợi (tối đa ${env.maxQueuePerUser}). Vui lòng đợi các ảnh hiện tại xong.`,
+      `You have too many images in the queue (limit ${env.maxQueuePerUser}). Please wait for the current batch to finish.`,
       'queue_full',
     );
   }
@@ -160,8 +160,8 @@ export async function createGenerations(
     if (opening.availableTokens < totalCost) {
       throw new AppError(
         402,
-        `Không đủ điểm cho ${jobCount} ảnh. Cần ${totalCost.toLocaleString('vi-VN')}, ` +
-          `hiện có ${opening.availableTokens.toLocaleString('vi-VN')}.`,
+        `Not enough credits for ${jobCount} image(s). This needs ${totalCost.toLocaleString('en-US')}, ` +
+          `you have ${opening.availableTokens.toLocaleString('en-US')}.`,
         'insufficient_tokens',
         { required: totalCost, available: opening.availableTokens },
       );
@@ -244,7 +244,7 @@ export async function redoGeneration(
     generationId,
     userId,
   ]);
-  if (!source) throw notFound('Không tìm thấy ảnh cần vẽ lại.');
+  if (!source) throw notFound('The image you want to regenerate no longer exists.');
 
   const model = await getActiveModel(source.model_code);
   const inputImages = parseInputImages(source);
@@ -323,12 +323,12 @@ export async function deleteGeneration(userId: number, generationId: number): Pr
     'SELECT id, status, deleted_at FROM generations WHERE id = ? AND user_id = ?',
     [generationId, userId],
   );
-  if (!row) throw notFound('Không tìm thấy ảnh cần xoá.');
+  if (!row) throw notFound('That image no longer exists.');
 
   // Ảnh đang vẽ vẫn chạy tiếp trong hàng đợi và vẫn ghi kết quả vào dòng này.
   // Cho xoá lúc đó thì ảnh biến mất rồi hiện lại khi vẽ xong — khách tưởng hỏng.
   if (row.status === 'queued' || row.status === 'processing') {
-    throw badRequest('Ảnh đang được tạo, vui lòng đợi xong rồi mới xoá.', 'generation_running');
+    throw badRequest('This image is still being generated. Please wait until it finishes.', 'generation_running');
   }
 
   // Xoá lại lần nữa không phải lỗi: khách bấm hai lần, hoặc hai tab cùng xoá.

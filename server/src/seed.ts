@@ -8,25 +8,28 @@ import { hashPassword } from './lib/auth.js';
  * `api_cost_usd`  = giá vốn mỗi ảnh theo bảng giá Kie.ai.
  * `token_cost`    = số điểm trừ của khách mỗi ảnh.
  *
- * QUY ƯỚC ĐƠN VỊ: **1 điểm = 1đ giá vốn nhà cung cấp**, nên
+ * QUY ƯỚC ĐƠN VỊ: **10.000 điểm = 1 USD giá vốn nhà cung cấp**, nên
  *
- *     token_cost = api_cost_usd × USD_TO_VND
+ *     token_cost = api_cost_usd × CREDITS_PER_USD    (mặc định 10.000)
  *
- * Nhờ vậy hạn mức "500.000đ tiền điểm theo giá gốc" quy thẳng thành 500.000 điểm,
- * và gói lẻ bán gấp đôi giá vốn chỉ đơn giản là 2đ cho mỗi điểm.
+ * Nhờ vậy "$25 tiền điểm theo giá gốc" quy thẳng thành 250.000 điểm, và gói bán
+ * gấp đôi giá vốn chỉ đơn giản là $1 mua được 5.000 điểm.
  *
- *   Model                    Giá vốn   Điểm/ảnh   Số ảnh trong hạn mức 1 tháng
- *   GPT Image 2 – 1K         $0.03       840        ~595
- *   GPT Image 2 – 2K         $0.05     1.400        ~357
- *   GPT Image 2 – 4K         $0.08     2.240        ~223
- *   Nano Banana 2 – 1K       $0.04     1.120        ~446
- *   Nano Banana 2 – 2K       $0.06     1.680        ~297
- *   Nano Banana 2 – 4K       $0.09     2.520        ~198
- *   Nano Banana Pro – 1K/2K  $0.09     2.520        ~198
- *   Nano Banana Pro – 4K     $0.12     3.360        ~148
+ *   Model                    Giá vốn   Điểm/ảnh   Số ảnh với gói $49.99
+ *   GPT Image 2 – 1K         $0.03        300        ~833
+ *   GPT Image 2 – 2K         $0.05        500        ~500
+ *   GPT Image 2 – 4K         $0.08        800        ~312
+ *   Nano Banana 2 – 1K       $0.04        400        ~625
+ *   Nano Banana 2 – 2K       $0.06        600        ~416
+ *   Nano Banana 2 – 4K       $0.09        900        ~277
+ *   Nano Banana Pro – 1K/2K  $0.09        900        ~277
+ *   Nano Banana Pro – 4K     $0.12      1.200        ~208
  *
- * Các số trên tính theo USD_TO_VND = 28.000. Đổi tỉ giá trong .env thì phải cập
- * nhật lại token_cost trong trang Quản trị → Bảng giá cho khớp.
+ * Đổi CREDITS_PER_USD trong .env thì phải cập nhật lại token_cost trong trang
+ * Quản trị → Bảng giá cho khớp — xem chú thích trong env.ts trước khi đụng tới.
+ *
+ * `label` và `notes` HIỂN THỊ CHO KHÁCH ở trang tạo ảnh nên viết bằng tiếng Anh.
+ * Mọi chuỗi chỉ admin nhìn thấy vẫn giữ tiếng Việt.
  *
  * `provider_model` là slug gửi lên API bên thứ 3, lấy theo tài liệu chính thức
  * (https://docs.kie.ai/llms.txt). Mỗi slug phải có đặc tả tham số tương ứng trong
@@ -42,9 +45,9 @@ const MODEL_PRICING = [
     family: 'nano-banana-pro',
     resolution: '1K',
     api_cost_usd: 0.09,
-    token_cost: 2520,
+    token_cost: 900,
     sort_order: 10,
-    notes: 'Chất lượng cao nhất, bám sát ảnh mẫu tốt nhất.',
+    notes: 'Highest fidelity — follows the reference layout most closely.',
   },
   {
     code: 'nano-banana-pro-2k',
@@ -54,9 +57,9 @@ const MODEL_PRICING = [
     family: 'nano-banana-pro',
     resolution: '2K',
     api_cost_usd: 0.09,
-    token_cost: 2520,
+    token_cost: 900,
     sort_order: 11,
-    notes: 'Cùng giá với bản 1K, nên ưu tiên dùng 2K.',
+    notes: 'Same cost as the 1K version, so prefer this one.',
   },
   {
     code: 'nano-banana-pro-4k',
@@ -66,9 +69,9 @@ const MODEL_PRICING = [
     family: 'nano-banana-pro',
     resolution: '4K',
     api_cost_usd: 0.12,
-    token_cost: 3360,
+    token_cost: 1200,
     sort_order: 12,
-    notes: 'Độ phân giải cao nhất, dùng cho ảnh in ấn.',
+    notes: 'Maximum resolution — use this one for print.',
   },
   {
     code: 'nano-banana-2-1k',
@@ -78,7 +81,7 @@ const MODEL_PRICING = [
     family: 'nano-banana-2',
     resolution: '1K',
     api_cost_usd: 0.04,
-    token_cost: 1120,
+    token_cost: 400,
     sort_order: 20,
     notes: null,
   },
@@ -90,7 +93,7 @@ const MODEL_PRICING = [
     family: 'nano-banana-2',
     resolution: '2K',
     api_cost_usd: 0.06,
-    token_cost: 1680,
+    token_cost: 600,
     sort_order: 21,
     notes: null,
   },
@@ -102,7 +105,7 @@ const MODEL_PRICING = [
     family: 'nano-banana-2',
     resolution: '4K',
     api_cost_usd: 0.09,
-    token_cost: 2520,
+    token_cost: 900,
     sort_order: 22,
     notes: null,
   },
@@ -114,9 +117,9 @@ const MODEL_PRICING = [
     family: 'gpt-image-2',
     resolution: '1K',
     api_cost_usd: 0.03,
-    token_cost: 840,
+    token_cost: 300,
     sort_order: 30,
-    notes: 'Rẻ nhất, hợp để thử bố cục trước khi chạy bản đẹp.',
+    notes: 'Cheapest option — good for testing a layout before the final run.',
   },
   {
     code: 'gpt-image-2-2k',
@@ -126,7 +129,7 @@ const MODEL_PRICING = [
     family: 'gpt-image-2',
     resolution: '2K',
     api_cost_usd: 0.05,
-    token_cost: 1400,
+    token_cost: 500,
     sort_order: 31,
     notes: null,
   },
@@ -138,7 +141,7 @@ const MODEL_PRICING = [
     family: 'gpt-image-2',
     resolution: '4K',
     api_cost_usd: 0.08,
-    token_cost: 2240,
+    token_cost: 800,
     sort_order: 32,
     notes: null,
   },
@@ -152,10 +155,10 @@ const MODEL_PRICING = [
     family: 'nano-banana-2-lite',
     resolution: '1K',
     api_cost_usd: 0,
-    token_cost: 700,
+    token_cost: 250,
     sort_order: 40,
     is_active: 0,
-    notes: 'CHƯA BÁN: cần điền giá vốn và số điểm thật từ bảng giá Kie.ai trước khi bật. Model này không có tuỳ chọn 2K/4K.',
+    notes: 'NOT ON SALE: fill in the real provider cost and credit price before enabling. This model has no 2K/4K option.',
   },
 ] as const;
 
@@ -167,8 +170,8 @@ const MODEL_PRICING = [
  * giao diện khách — chúng chỉ còn để admin cấp tay cho khách VIP trong Quản trị
  * → Khách hàng → nút "Gói", và để những gói đã bán trước đây chạy hết hạn.
  *
- * Giữ nguyên giá cũ trong danh sách này là có chủ đích: đó là giá của các bản
- * ghi `subscriptions` đang tồn tại, sửa đi thì báo cáo doanh thu cũ lệch.
+ * Giá ghi bằng USD cent. Các gói này KHÔNG bán nên con số chỉ còn ý nghĩa khi
+ * admin cấp tay: nó là giá trị ghi vào bản ghi `subscriptions` để đối soát.
  */
 const MONTHLY_TOKEN_ALLOWANCE = 500_000;
 
@@ -177,7 +180,7 @@ const SUBSCRIPTION_PLANS = [
     code: 'FREE',
     name: 'Gói miễn phí',
     months: 12,
-    price_vnd: 0,
+    price_usd_cents: 0,
     monthly_token_allowance: 0,
     description: 'Không được tặng điểm hàng tháng — khách nạp điểm lẻ để dùng.',
     is_popular: 0,
@@ -188,7 +191,7 @@ const SUBSCRIPTION_PLANS = [
     code: 'MONTHLY_1',
     name: 'Gói 1 tháng',
     months: 1,
-    price_vnd: 1_500_000,
+    price_usd_cents: 9_999,
     description: 'Đã ngừng bán — chỉ admin cấp tay.',
     is_popular: 0,
     is_active: 0,
@@ -198,7 +201,7 @@ const SUBSCRIPTION_PLANS = [
     code: 'MONTHLY_3',
     name: 'Gói 3 tháng',
     months: 3,
-    price_vnd: 4_275_000,
+    price_usd_cents: 28_499,
     description: 'Đã ngừng bán — chỉ admin cấp tay.',
     is_popular: 0,
     is_active: 0,
@@ -208,7 +211,7 @@ const SUBSCRIPTION_PLANS = [
     code: 'MONTHLY_6',
     name: 'Gói 6 tháng',
     months: 6,
-    price_vnd: 8_100_000,
+    price_usd_cents: 53_999,
     description: 'Đã ngừng bán — chỉ admin cấp tay.',
     is_popular: 0,
     is_active: 0,
@@ -218,7 +221,7 @@ const SUBSCRIPTION_PLANS = [
     code: 'MONTHLY_12',
     name: 'Gói 1 năm',
     months: 12,
-    price_vnd: 15_300_000,
+    price_usd_cents: 101_999,
     description: 'Đã ngừng bán — chỉ admin cấp tay.',
     is_popular: 0,
     is_active: 0,
@@ -230,66 +233,67 @@ const SUBSCRIPTION_PLANS = [
  * GÓI ĐIỂM — sản phẩm duy nhất đang bán.
  *
  * Quy tắc: khách nhận được **một nửa** lượng điểm so với số tiền bỏ ra tính theo
- * giá vốn (tức bán gấp đôi giá vốn). Vì 1 điểm = 1đ giá vốn, gói X đồng cho
- * khoảng X/2 điểm. Giá bán làm tròn xuống mốc x99.000đ:
+ * giá vốn (tức bán gấp đôi giá vốn). Vì 10.000 điểm = $1 giá vốn, $1 tiền bán
+ * mua được 5.000 điểm. Giá niêm yết làm tròn xuống mốc x9,99:
  *
- *   Gói          Điểm nhận     Đơn giá
- *   99.000đ      50.000        1,98đ/điểm
- *   199.000đ     100.000       1,99đ/điểm
- *   499.000đ     250.000       2,00đ/điểm
- *   999.000đ     500.000       2,00đ/điểm
- *   1.999.000đ   1.000.000     2,00đ/điểm
+ *   Gói        Điểm nhận    Giá vốn số điểm    Đơn giá
+ *   $9,99         50.000            $5,00      $0,0002/điểm
+ *   $19,99       100.000           $10,00      $0,0002/điểm
+ *   $49,99       250.000           $25,00      $0,0002/điểm
+ *   $99,99       500.000           $50,00      $0,0002/điểm
+ *   $199,99    1.000.000          $100,00      $0,0002/điểm
  *
+ * `name` và `description` HIỂN THỊ CHO KHÁCH nên viết bằng tiếng Anh.
  * Điểm KHÔNG hết hạn — mua bao nhiêu dùng dần bấy nhiêu.
  */
 const TOKEN_PACKAGES = [
   {
-    code: 'EXTRA_99',
-    name: 'Gói 99.000đ',
-    price_vnd: 99_000,
+    code: 'CREDITS_10',
+    name: 'Starter',
+    price_usd_cents: 999,
     base_tokens: MONTHLY_TOKEN_ALLOWANCE / 10,
     bonus_tokens: 0,
-    description: 'Mua nhanh để dùng thử.',
+    description: 'A quick top-up to try things out.',
     is_popular: 0,
     sort_order: 5,
   },
   {
-    code: 'EXTRA_199',
-    name: 'Gói 199.000đ',
-    price_vnd: 199_000,
+    code: 'CREDITS_20',
+    name: 'Basic',
+    price_usd_cents: 1_999,
     base_tokens: MONTHLY_TOKEN_ALLOWANCE / 5,
     bonus_tokens: 0,
-    description: 'Hợp cho nhu cầu vài chục ảnh mỗi tháng.',
+    description: 'Enough for a few dozen images a month.',
     is_popular: 0,
     sort_order: 10,
   },
   {
-    code: 'EXTRA_499',
-    name: 'Gói 499.000đ',
-    price_vnd: 499_000,
+    code: 'CREDITS_50',
+    name: 'Pro',
+    price_usd_cents: 4_999,
     base_tokens: MONTHLY_TOKEN_ALLOWANCE / 2,
     bonus_tokens: 0,
-    description: 'Lựa chọn phổ biến nhất cho shop bán hàng.',
+    description: 'The most popular choice for online stores.',
     is_popular: 1,
     sort_order: 20,
   },
   {
-    code: 'EXTRA_999',
-    name: 'Gói 999.000đ',
-    price_vnd: 999_000,
+    code: 'CREDITS_100',
+    name: 'Business',
+    price_usd_cents: 9_999,
     base_tokens: MONTHLY_TOKEN_ALLOWANCE,
     bonus_tokens: 0,
-    description: 'Đủ dùng cho cả một chiến dịch.',
+    description: 'Covers a full campaign end to end.',
     is_popular: 0,
     sort_order: 30,
   },
   {
-    code: 'EXTRA_1999',
-    name: 'Gói 1.999.000đ',
-    price_vnd: 1_999_000,
+    code: 'CREDITS_200',
+    name: 'Agency',
+    price_usd_cents: 19_999,
     base_tokens: MONTHLY_TOKEN_ALLOWANCE * 2,
     bonus_tokens: 0,
-    description: 'Cho team chạy nội dung số lượng lớn.',
+    description: 'For teams producing content at volume.',
     is_popular: 0,
     sort_order: 40,
   },
@@ -297,7 +301,6 @@ const TOKEN_PACKAGES = [
 
 const DEFAULT_SETTINGS: Record<string, string> = {
   site_name: 'Design Copycat AI',
-  topup_note: 'Chuyển khoản đúng số tiền và ghi đúng nội dung để hệ thống cộng điểm tự động.',
   free_tokens_on_signup: '0',
 
   /*
@@ -311,7 +314,7 @@ const DEFAULT_SETTINGS: Record<string, string> = {
    */
   affiliate_enabled: '1',
   affiliate_commission_percent: '40',
-  affiliate_fixed_cost_vnd: '0',
+  affiliate_fixed_cost_usd_cents: '0',
   affiliate_fixed_cost_percent: '0',
 };
 
@@ -323,7 +326,6 @@ export async function seed(): Promise<void> {
   await repairKnownBadModelSlugs();
   await migratePricingToCostUnits();
   await retireSubscriptionPlans();
-  await refreshStalePackageDescriptions();
 
   for (const model of MODEL_PRICING) {
     await execute(
@@ -349,12 +351,12 @@ export async function seed(): Promise<void> {
   for (const pkg of TOKEN_PACKAGES) {
     await execute(
       `INSERT IGNORE INTO token_packages
-         (code, name, price_vnd, base_tokens, bonus_tokens, description, is_popular, sort_order)
+         (code, name, price_usd_cents, base_tokens, bonus_tokens, description, is_popular, sort_order)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         pkg.code,
         pkg.name,
-        pkg.price_vnd,
+        pkg.price_usd_cents,
         pkg.base_tokens,
         pkg.bonus_tokens,
         pkg.description,
@@ -367,13 +369,13 @@ export async function seed(): Promise<void> {
   for (const plan of SUBSCRIPTION_PLANS) {
     await execute(
       `INSERT IGNORE INTO subscription_plans
-         (code, name, months, price_vnd, monthly_token_allowance, description, is_popular, is_active, sort_order)
+         (code, name, months, price_usd_cents, monthly_token_allowance, description, is_popular, is_active, sort_order)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         plan.code,
         plan.name,
         plan.months,
-        plan.price_vnd,
+        plan.price_usd_cents,
         'monthly_token_allowance' in plan ? plan.monthly_token_allowance : MONTHLY_TOKEN_ALLOWANCE,
         plan.description,
         plan.is_popular,
@@ -471,88 +473,57 @@ async function retireSubscriptionPlans(): Promise<void> {
 }
 
 /**
- * Thay mô tả gói điểm đời cũ — chúng còn nhắc tới "hạn mức tháng".
+ * Chuyển dữ liệu cũ sang đơn vị điểm hiện hành (10.000 điểm = $1 giá vốn).
  *
- * `INSERT IGNORE` ở trên không đụng tới dòng đã tồn tại, nên khi gói tháng ngừng
- * bán thì mô tả cũ vẫn nằm nguyên trong database và hiện ra trên trang bán hàng:
- * khách đọc "Bằng 1/10 hạn mức một tháng" mà không biết hạn mức tháng là gì.
+ * Bảng giá đã qua ba đời đơn vị: 1 điểm ≈ 100đ giá bán → 1 điểm = 1đ giá vốn →
+ * 1 điểm = $0,0001 giá vốn. Vì vậy mỗi model có nhiều giá trị cũ có thể gặp.
  *
- * CHỈ sửa dòng còn giữ ĐÚNG NGUYÊN VĂN mô tả cũ. Admin đã tự viết lại thì để
- * nguyên — ghi đè chữ do người vận hành đặt là mất công họ gõ lại.
- */
-const LEGACY_PACKAGE_DESCRIPTIONS: Record<string, string> = {
-  EXTRA_99: 'Bằng 1/10 hạn mức một tháng — mua nhanh khi sắp cạn.',
-  EXTRA_199: 'Bằng 1/5 hạn mức một tháng.',
-  EXTRA_499: 'Bằng một nửa hạn mức một tháng.',
-  EXTRA_999: 'Bằng đúng hạn mức của một tháng.',
-  EXTRA_1999: 'Gấp đôi hạn mức tháng, hợp cho đợt chạy chiến dịch lớn.',
-};
-
-async function refreshStalePackageDescriptions(): Promise<void> {
-  let updated = 0;
-
-  for (const pkg of TOKEN_PACKAGES) {
-    const stale = LEGACY_PACKAGE_DESCRIPTIONS[pkg.code];
-    if (!stale) continue;
-
-    const result = await execute('UPDATE token_packages SET description = ? WHERE code = ? AND description = ?', [
-      pkg.description,
-      pkg.code,
-      stale,
-    ]);
-    updated += result.affectedRows;
-  }
-
-  if (updated > 0) {
-    console.log(`[seed] Đã thay mô tả của ${updated} gói điểm còn nhắc tới hạn mức tháng.`);
-  }
-}
-
-/**
- * Chuyển dữ liệu cũ sang đơn vị điểm mới (1 điểm = 1đ giá vốn).
- *
- * Trước đây 1 điểm ≈ 100đ giá bán, giờ neo vào giá vốn nên mọi con số lệch nhau
- * khoảng 28 lần. Chỉ sửa những dòng vẫn giữ đúng giá trị seed cũ — dòng nào admin
- * đã tự chỉnh thì để nguyên, tránh ghi đè quyết định của người vận hành.
+ * CHỈ sửa dòng vẫn giữ đúng một trong các giá trị seed cũ — dòng nào admin đã tự
+ * chỉnh thì để nguyên, tránh ghi đè quyết định của người vận hành.
  */
 async function migratePricingToCostUnits(): Promise<void> {
-  const modelFixes: { code: string; oldCost: number; newCost: number }[] = [
-    { code: 'nano-banana-pro-1k', oldCost: 80, newCost: 2520 },
-    { code: 'nano-banana-pro-2k', oldCost: 80, newCost: 2520 },
-    { code: 'nano-banana-pro-4k', oldCost: 105, newCost: 3360 },
-    { code: 'nano-banana-2-1k', oldCost: 40, newCost: 1120 },
-    { code: 'nano-banana-2-2k', oldCost: 55, newCost: 1680 },
-    { code: 'nano-banana-2-4k', oldCost: 80, newCost: 2520 },
-    { code: 'gpt-image-2-1k', oldCost: 30, newCost: 840 },
-    { code: 'gpt-image-2-2k', oldCost: 45, newCost: 1400 },
-    { code: 'gpt-image-2-4k', oldCost: 70, newCost: 2240 },
-    { code: 'nano-banana-2-lite', oldCost: 25, newCost: 700 },
+  const modelFixes: { code: string; oldCosts: number[]; newCost: number }[] = [
+    { code: 'nano-banana-pro-1k', oldCosts: [80, 2520], newCost: 900 },
+    { code: 'nano-banana-pro-2k', oldCosts: [80, 2520], newCost: 900 },
+    { code: 'nano-banana-pro-4k', oldCosts: [105, 3360], newCost: 1200 },
+    { code: 'nano-banana-2-1k', oldCosts: [40, 1120], newCost: 400 },
+    { code: 'nano-banana-2-2k', oldCosts: [55, 1680], newCost: 600 },
+    { code: 'nano-banana-2-4k', oldCosts: [80, 2520], newCost: 900 },
+    { code: 'gpt-image-2-1k', oldCosts: [30, 840], newCost: 300 },
+    { code: 'gpt-image-2-2k', oldCosts: [45, 1400], newCost: 500 },
+    { code: 'gpt-image-2-4k', oldCosts: [70, 2240], newCost: 800 },
+    { code: 'nano-banana-2-lite', oldCosts: [25, 700], newCost: 250 },
   ];
 
   let converted = 0;
   for (const fix of modelFixes) {
-    const result = await execute('UPDATE model_pricing SET token_cost = ? WHERE code = ? AND token_cost = ?', [
-      fix.newCost,
-      fix.code,
-      fix.oldCost,
-    ]);
+    const placeholders = fix.oldCosts.map(() => '?').join(',');
+    const result = await execute(
+      `UPDATE model_pricing SET token_cost = ? WHERE code = ? AND token_cost IN (${placeholders})`,
+      [fix.newCost, fix.code, ...fix.oldCosts],
+    );
     converted += result.affectedRows;
   }
   if (converted > 0) {
-    console.log(`[seed] Đã quy đổi ${converted} dòng bảng giá sang đơn vị điểm mới (1 điểm = 1đ giá vốn).`);
+    console.log(`[seed] Đã quy đổi ${converted} dòng bảng giá sang đơn vị điểm mới (10.000 điểm = $1 giá vốn).`);
   }
 
-  // Gói điểm lẻ đời cũ tính theo 100đ/điểm — sai đơn vị hoàn toàn, ngừng bán.
-  // EXTRA_200K/500K/1M/2M là bộ giá tạm ở bản trước, nay thay bằng bộ neo theo
-  // hạn mức tháng (EXTRA_199/499/999/1999).
+  /*
+   * Ngừng bán mọi gói điểm định giá bằng VNĐ.
+   *
+   * Cột `price_usd_cents` của chúng đang giữ nguyên con số VNĐ cũ (migration chỉ
+   * đổi tên cột, xem db.ts), nên để bán tiếp là bán gói 99.000 với giá $990.
+   * Bộ gói USD mới dùng mã CREDITS_* nên không đụng tới các dòng này.
+   */
   const retired = await execute(
     `UPDATE token_packages SET is_active = 0
       WHERE code IN ('STARTER','CREATOR','CREATOR_PLUS','STUDIO','AGENCY',
-                     'EXTRA_200K','EXTRA_500K','EXTRA_1M','EXTRA_2M')
+                     'EXTRA_200K','EXTRA_500K','EXTRA_1M','EXTRA_2M',
+                     'EXTRA_99','EXTRA_199','EXTRA_499','EXTRA_999','EXTRA_1999')
         AND is_active = 1`,
   );
   if (retired.affectedRows > 0) {
-    console.log(`[seed] Đã ngừng bán ${retired.affectedRows} gói điểm đời cũ.`);
+    console.log(`[seed] Đã ngừng bán ${retired.affectedRows} gói điểm định giá bằng VNĐ.`);
   }
 
   // Nano Banana 2 Lite từng bị chèn vào DB khi câu INSERT chưa có cột is_active,
@@ -561,7 +532,7 @@ async function migratePricingToCostUnits(): Promise<void> {
   // nếu admin đã điền giá thật thì tôn trọng quyết định đó.
   const liteOff = await execute(
     `UPDATE model_pricing SET is_active = 0
-      WHERE code = 'nano-banana-2-lite' AND api_cost_usd = 0 AND token_cost = 700 AND is_active = 1`,
+      WHERE code = 'nano-banana-2-lite' AND api_cost_usd = 0 AND token_cost = 250 AND is_active = 1`,
   );
   if (liteOff.affectedRows > 0) {
     console.log('[seed] Đã tắt bán Nano Banana 2 Lite (chưa có giá vốn thật).');

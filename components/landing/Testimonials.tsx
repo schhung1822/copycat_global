@@ -7,37 +7,39 @@ import { SectionHeading } from './SectionHeading';
  *
  * Ba lời chứng thực dưới đây do người viết trang dựng ra để canh bố cục, KHÔNG
  * phải đánh giá của khách hàng thật. Đăng nguyên như vậy là quảng cáo sai sự
- * thật với người mua.
+ * thật với người mua — ở Mỹ và EU còn là vi phạm luật quảng cáo, không chỉ là
+ * chuyện đạo đức.
  *
- * Cách thay: lấy đánh giá thật (tin nhắn Facebook, Zalo, phản hồi qua email) và
- * xin phép người viết trước khi trích tên. Nếu chưa có đánh giá nào, xoá hẳn
- * phần này khỏi `LandingPage.tsx` — bỏ trống còn hơn là bịa.
+ * Tên người đã đổi thành "Sample Name" cho lộ hẳn ra rằng đây là chỗ giữ chỗ.
+ * Cách thay: lấy đánh giá thật và xin phép người viết trước khi trích tên. Nếu
+ * chưa có đánh giá nào, xoá hẳn phần này khỏi `LandingPage.tsx` — bỏ trống còn
+ * hơn là bịa.
  */
 const TESTIMONIALS = [
   {
     quote:
-      'Trước đây mỗi đợt hàng mới em phải book studio, chờ ba ngày mới có ảnh. Giờ chụp bằng điện thoại rồi cho vào đây, chiều là có ảnh lên sàn.',
-    name: 'Nguyễn Thị Nguyệt',
-    role: 'Chủ shop thời trang',
+      'Every new drop used to mean booking a studio and waiting three days for photos. Now I shoot on my phone, drop it in here, and the listing is live by the afternoon.',
+    name: 'Sample Name',
+    role: 'Fashion store owner',
   },
   {
     quote:
-      'Cái em thích nhất là ra được bốn phương án một lượt. Chạy quảng cáo cần nhiều biến thể để test, tự làm tay thì không kịp.',
-    name: 'Đặng Thành Nam',
-    role: 'Người chạy quảng cáo',
+      'What I like most is getting four variants in one run. Paid ads need a lot of creative to test against, and doing that by hand never kept up.',
+    name: 'Sample Name',
+    role: 'Performance marketer',
   },
   {
     quote:
-      'Khách gửi link tham khảo và bảo làm giống vậy. Bên mình dựng bản demo ngay trong buổi họp, chốt hướng xong mới bắt tay làm bản chính.',
-    name: 'Ngô Hồng Sơn',
-    role: 'Agency sáng tạo',
+      'Clients send a reference link and ask for the same thing with their product. We build the demo during the call and agree the direction before doing the real work.',
+    name: 'Sample Name',
+    role: 'Creative agency',
   },
 ];
 
 export const Testimonials: React.FC = () => (
   <section className="border-y border-dark-800 bg-dark-900/40 py-14 sm:py-20 lg:py-28">
     <div className="mx-auto max-w-[1280px] px-4 sm:px-6">
-      <SectionHeading eyebrow="Phản hồi" title="Người dùng nói gì" />
+      <SectionHeading eyebrow="Testimonials" title="What people say" />
 
       <div className="mt-10 grid sm:mt-14 gap-4 lg:grid-cols-3">
         {TESTIMONIALS.map((item, index) => (

@@ -23,9 +23,9 @@ export const AccountPage: React.FC = () => {
     try {
       await api.patch('/auth/me', { fullName: profile.fullName, phone: profile.phone });
       await refreshUser();
-      setProfileMessage({ tone: 'success', text: 'Đã lưu thông tin.' });
+      setProfileMessage({ tone: 'success', text: 'Your details were saved.' });
     } catch (err) {
-      setProfileMessage({ tone: 'error', text: err instanceof ApiError ? err.message : 'Lưu thất bại.' });
+      setProfileMessage({ tone: 'error', text: err instanceof ApiError ? err.message : 'Could not save.' });
     } finally {
       setSavingProfile(false);
     }
@@ -36,19 +36,22 @@ export const AccountPage: React.FC = () => {
     setPasswordMessage(null);
 
     if (passwords.next.length < 6) {
-      return setPasswordMessage({ tone: 'error', text: 'Mật khẩu mới phải có ít nhất 6 ký tự.' });
+      return setPasswordMessage({ tone: 'error', text: 'The new password must be at least 6 characters.' });
     }
     if (passwords.next !== passwords.confirm) {
-      return setPasswordMessage({ tone: 'error', text: 'Hai mật khẩu mới không khớp nhau.' });
+      return setPasswordMessage({ tone: 'error', text: 'The two new passwords do not match.' });
     }
 
     setSavingPassword(true);
     try {
       await api.post('/auth/me/password', { currentPassword: passwords.current, newPassword: passwords.next });
       setPasswords({ current: '', next: '', confirm: '' });
-      setPasswordMessage({ tone: 'success', text: 'Đã đổi mật khẩu.' });
+      setPasswordMessage({ tone: 'success', text: 'Password changed.' });
     } catch (err) {
-      setPasswordMessage({ tone: 'error', text: err instanceof ApiError ? err.message : 'Đổi mật khẩu thất bại.' });
+      setPasswordMessage({
+        tone: 'error',
+        text: err instanceof ApiError ? err.message : 'Could not change your password.',
+      });
     } finally {
       setSavingPassword(false);
     }
@@ -56,7 +59,7 @@ export const AccountPage: React.FC = () => {
 
   return (
     <div className="max-w-2xl mx-auto p-6 space-y-6">
-      <h1 className="text-2xl font-bold text-gray-100">Thông tin tài khoản</h1>
+      <h1 className="text-2xl font-bold text-gray-100">Account settings</h1>
 
       <Card className="p-5">
         <div className="flex justify-between text-sm pb-4 mb-4 border-b border-dark-800">
@@ -65,7 +68,7 @@ export const AccountPage: React.FC = () => {
             <p className="text-gray-100 mt-1">{user?.email}</p>
           </div>
           <div className="text-right">
-            <p className="text-gray-500 text-xs uppercase tracking-wider font-bold">Tham gia</p>
+            <p className="text-gray-500 text-xs uppercase tracking-wider font-bold">Member since</p>
             <p className="text-gray-300 mt-1">{formatDateTime(user?.createdAt)}</p>
           </div>
         </div>
@@ -73,7 +76,7 @@ export const AccountPage: React.FC = () => {
         <form onSubmit={saveProfile} className="space-y-4">
           {profileMessage && <Alert tone={profileMessage.tone}>{profileMessage.text}</Alert>}
 
-          <Field label="Họ và tên">
+          <Field label="Full name">
             <input
               className={inputClass}
               value={profile.fullName}
@@ -81,7 +84,7 @@ export const AccountPage: React.FC = () => {
             />
           </Field>
 
-          <Field label="Số điện thoại">
+          <Field label="Phone number">
             <input
               className={inputClass}
               value={profile.phone}
@@ -90,17 +93,17 @@ export const AccountPage: React.FC = () => {
           </Field>
 
           <Button type="submit" isLoading={savingProfile} className="!rounded-xl !py-2.5">
-            Lưu thay đổi
+            Save changes
           </Button>
         </form>
       </Card>
 
       <Card className="p-5">
-        <h2 className="font-bold text-gray-100 mb-4">Đổi mật khẩu</h2>
+        <h2 className="font-bold text-gray-100 mb-4">Change password</h2>
         <form onSubmit={savePassword} className="space-y-4">
           {passwordMessage && <Alert tone={passwordMessage.tone}>{passwordMessage.text}</Alert>}
 
-          <Field label="Mật khẩu hiện tại">
+          <Field label="Current password">
             <input
               type="password"
               className={inputClass}
@@ -111,7 +114,7 @@ export const AccountPage: React.FC = () => {
             />
           </Field>
 
-          <Field label="Mật khẩu mới">
+          <Field label="New password">
             <input
               type="password"
               className={inputClass}
@@ -122,7 +125,7 @@ export const AccountPage: React.FC = () => {
             />
           </Field>
 
-          <Field label="Nhập lại mật khẩu mới">
+          <Field label="Confirm new password">
             <input
               type="password"
               className={inputClass}
@@ -134,7 +137,7 @@ export const AccountPage: React.FC = () => {
           </Field>
 
           <Button type="submit" isLoading={savingPassword} variant="secondary" className="!rounded-xl !py-2.5">
-            Đổi mật khẩu
+            Change password
           </Button>
         </form>
       </Card>

@@ -14,39 +14,39 @@ const Icon: React.FC<{ path: string }> = ({ path }) => (
 
 const FEATURES = [
   {
-    title: 'Bám sát bố cục ảnh mẫu',
-    body: 'Góc máy, ánh sáng, khoảng trắng, vị trí chữ — giữ đúng cái làm nên vẻ đẹp của ảnh gốc, chỉ thay sản phẩm.',
+    title: 'Faithful to the reference layout',
+    body: 'Camera angle, lighting, white space, text placement — everything that makes the original work is kept. Only the product changes.',
     icon: 'M4 6a2 2 0 012-2h5v16H6a2 2 0 01-2-2V6zm9-2h5a2 2 0 012 2v12a2 2 0 01-2 2h-5V4z',
     span: 'lg:col-span-2',
   },
   {
-    title: 'Ba dòng model, chín mức chất lượng',
-    body: 'Nano Banana Pro bám mẫu tốt nhất, Nano Banana 2 cân bằng, GPT Image 2 mạnh về chữ và layout quảng cáo.',
+    title: 'Three model families, nine quality tiers',
+    body: 'Nano Banana Pro follows the reference most closely, Nano Banana 2 balances speed and quality, GPT Image 2 excels at text and ad layouts.',
     icon: 'M12 3l2.4 5.5L20 10l-4.2 3.8L17 20l-5-2.9L7 20l1.2-6.2L4 10l5.6-1.5L12 3z',
   },
   {
-    title: 'Tạo hàng loạt trong một lượt',
-    body: 'Nhiều ảnh mẫu × tối đa 4 phương án mỗi ảnh. Chạy nền, không phải ngồi chờ từng tấm một.',
+    title: 'Batch generation in one go',
+    body: 'Multiple references × up to 4 variants each. It all runs in the background — no waiting on one image at a time.',
     icon: 'M8 4h11a1 1 0 011 1v11M5 8h11a1 1 0 011 1v10a1 1 0 01-1 1H5a1 1 0 01-1-1V9a1 1 0 011-1z',
   },
   {
-    title: 'Làm nét & Tái tạo sản phẩm',
-    body: 'Tăng cường độ sắc nét cho ảnh mờ nhòe, hoặc yêu cầu hệ thống vẽ lại sản phẩm sang một định dạng hoàn toàn mới theo nhu cầu.',
+    title: 'Sharpen & reimagine products',
+    body: 'Rescue blurry shots, or ask the system to redraw your product in a completely different format.',
     icon: 'M4 8V5a1 1 0 011-1h3m8 0h3a1 1 0 011 1v3m0 8v3a1 1 0 01-1 1h-3m-8 0H5a1 1 0 01-1-1v-3',
   },
   {
-    title: 'Ảnh lỗi tự hoàn điểm',
-    body: 'Nhà cung cấp trả về lỗi thì hệ thống hoàn lại đúng số điểm đã trừ, không cần nhắn tin khiếu nại.',
+    title: 'Failed images refund themselves',
+    body: 'If the provider returns an error, the exact credits are put straight back. No support ticket needed.',
     icon: 'M4 4v6h6M20 20v-6h-6M4.6 15a8 8 0 0014-3M19.4 9A8 8 0 005 12',
   },
   {
-    title: 'Lịch sử lưu đủ, tải lại bất cứ lúc nào',
-    body: 'Xem lại toàn bộ ảnh đã tạo cùng ghi chú và thông số đã dùng, tải về hoặc chạy lại với ghi chú mới.',
+    title: 'Full history, re-downloadable any time',
+    body: 'Every image you have generated, with the notes and settings used. Download it again, or rerun it with new notes.',
     icon: 'M12 8v4l3 2m6-2a9 9 0 11-18 0 9 9 0 0118 0z',
   },
   {
-    title: 'Ví điểm minh bạch từng lượt',
-    body: 'Mỗi lần tạo ảnh đều có dòng sao kê riêng: model nào, hết bao nhiêu điểm, còn lại bao nhiêu. Ảnh lỗi hoàn điểm cũng ghi rõ.',
+    title: 'A credit ledger you can audit',
+    body: 'Every generation gets its own line: which model, how many credits, what was left afterwards. Refunds are itemised too.',
     icon: 'M3 8a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8zm13 4h2',
     span: 'lg:col-span-2',
   },
@@ -57,12 +57,12 @@ const FEATURES = [
  * tám ô đều tăm tắp. Ô rộng dành cho hai tính năng bán hàng mạnh nhất.
  */
 export const Features: React.FC = () => (
-  <section id="tinh-nang" className="scroll-mt-20 border-y border-dark-800 bg-dark-900/40 py-14 sm:py-20 lg:py-28">
+  <section id="features" className="scroll-mt-20 border-y border-dark-800 bg-dark-900/40 py-14 sm:py-20 lg:py-28">
     <div className="mx-auto max-w-[1280px] px-4 sm:px-6">
       <SectionHeading
-        eyebrow="Tính năng"
-        title="Đủ thứ cần thiết để dựng ảnh bán hàng"
-        description="Không phải một hộp chat chung chung. Từng chức năng ở đây sinh ra cho đúng một việc: ra ảnh sản phẩm dùng được."
+        eyebrow="Features"
+        title="Everything you need to build selling imagery"
+        description="Not a general-purpose chat box. Every feature here exists for one job: producing product images you can actually publish."
       />
 
       <div className="mt-10 grid sm:mt-14 gap-4 sm:grid-cols-2 lg:grid-cols-3">

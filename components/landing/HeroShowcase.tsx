@@ -12,78 +12,78 @@ interface Sample {
 
 const SAMPLES: Sample[] = [
   {
-    label: 'Nữ',
-    reference: { src: '/img/mau2.webp', alt: 'Ảnh mẫu ngành mỹ phẩm' },
-    product: { src: '/img/ao2.webp', alt: 'Ảnh sản phẩm mỹ phẩm' },
-    result: { src: '/img/kq2.webp', alt: 'Ảnh kết quả ngành mỹ phẩm' },
+    label: 'Womenswear',
+    reference: { src: '/img/mau2.webp', alt: 'Reference design for a womenswear ad' },
+    product: { src: '/img/ao2.webp', alt: 'Product photo of a womenswear outfit' },
+    result: { src: '/img/kq2.webp', alt: 'Generated womenswear ad using the reference layout' },
     post: {
-      page: 'Thời trang nữ',
-      caption: 'Outfit này mặc đi làm, đi cà phê hay dạo phố đều rất hợp cho các bạn nữ.',
-      domain: 'thoitrangnu.com',
-      headline: 'Set đồ nữ đẹp',
+      page: 'Womenswear Daily',
+      caption: 'An outfit that works for the office, coffee runs and everything in between.',
+      domain: 'womenswear.example',
+      headline: 'Everyday Outfit Set',
     },
   },
   {
     label: 'Poster',
-    reference: { src: '/img/mau4.webp', alt: 'Ảnh mẫu ngành thời trang nữ tuổi teen' },
-    product: { src: '/img/ao4.webp', alt: 'Ảnh sản phẩm thời trang nữ tuổi teen' },
-    result: { src: '/img/kq4.webp', alt: 'Ảnh kết quả ngành thời trang nữ tuổi teen' },
+    reference: { src: '/img/mau4.webp', alt: 'Reference design for a teen fashion poster' },
+    product: { src: '/img/ao4.webp', alt: 'Product photo of a teen fashion outfit' },
+    result: { src: '/img/kq4.webp', alt: 'Generated teen fashion poster using the reference layout' },
     post: {
-      page: 'Thời Trang Gen Z',
-      caption: '✨ Tự tin khoe cá tính với bộ sưu tập mới nhất! Thiết kế năng động, trendy.',
-      domain: 'thoitrangteen.vn',
-      headline: 'Set Đồ Nữ Váy Áo Cực Xinh',
+      page: 'Gen Z Style',
+      caption: '✨ Show off your personality with the new drop. Bold, playful, made to move in.',
+      domain: 'genzstyle.example',
+      headline: 'Dress & Top Bundle',
     },
   },
   {
     label: 'Poster',
-    reference: { src: '/img/mau5.webp', alt: 'Ảnh mẫu ngành thời trang trẻ em nữ' },
-    product: { src: '/img/ao5.webp', alt: 'Ảnh sản phẩm thời trang trẻ em nữ' },
-    result: { src: '/img/kq5.webp', alt: 'Ảnh kết quả ngành thời trang trẻ em nữ' },
+    reference: { src: '/img/mau5.webp', alt: 'Reference design for a girls kidswear poster' },
+    product: { src: '/img/ao5.webp', alt: 'Product photo of a girls kidswear outfit' },
+    result: { src: '/img/kq5.webp', alt: 'Generated girls kidswear poster using the reference layout' },
     post: {
-      page: 'Thời Trang Bé Yêu',
-      caption: '🎀 Hóa công chúa nhỏ ngọt ngào. Chất liệu cotton mềm mịn, thoáng mát.',
-      domain: 'quanaochobe.com',
-      headline: 'Váy Đầm Xinh Xắn Cho Bé Gái',
+      page: 'Little Ones Fashion',
+      caption: '🎀 Sweet little princess energy. Soft, breathable cotton all the way through.',
+      domain: 'littleones.example',
+      headline: 'Pretty Dresses For Girls',
     },
   },
   {
     label: 'Poster',
-    reference: { src: '/img/mau6.webp', alt: 'Ảnh mẫu ngành Thời trang trẻ em nam' },
-    product: { src: '/img/ao6.webp', alt: 'Ảnh sản phẩm Thời trang trẻ em nam' },
-    result: { src: '/img/kq6.webp', alt: 'Ảnh kết quả ngành Thời trang trẻ em nam' },
+    reference: { src: '/img/mau6.webp', alt: 'Reference design for a boys kidswear poster' },
+    product: { src: '/img/ao6.webp', alt: 'Product photo of a boys kidswear outfit' },
+    result: { src: '/img/kq6.webp', alt: 'Generated boys kidswear poster using the reference layout' },
     post: {
-      page: 'Thời Trang Bé Yêu',
-      caption: '😎 Hóa "soái ca nhí" vạn người mê! Lên đồ cực chất, form rộng thoải mái.',
-      domain: 'quanaochobe.com',
-      headline: 'Set Đồ Bò Denim Cực Ngầu Cho Bé',
+      page: 'Little Ones Fashion',
+      caption: '😎 Instant little heartbreaker. Relaxed fit, tough enough for the playground.',
+      domain: 'littleones.example',
+      headline: 'Denim Set For Boys',
     },
   },
   {
-    label: 'Thời trang thể thao',
-    reference: { src: '/img/mau7.webp', alt: 'Ảnh mẫu: poster quảng cáo áo thun thể thao' },
-    product: { src: '/img/ao7.webp', alt: 'Ảnh sản phẩm: bộ áo và quần thể thao chụp trên nền trắng' },
+    label: 'Sportswear',
+    reference: { src: '/img/mau7.webp', alt: 'Reference design: sports t-shirt ad poster' },
+    product: { src: '/img/ao7.webp', alt: 'Product photo: sports top and shorts on a white background' },
     result: {
       src: '/img/kq7.webp',
-      alt: 'Ảnh kết quả: bộ sản phẩm được dựng lại theo đúng bố cục của poster mẫu',
+      alt: 'Generated result: the product set rebuilt in the exact layout of the reference poster',
     },
     post: {
       page: 'Veroww Mens Fashion',
-      caption: 'Bộ thể thao nam mới về — chất mát, form rộng thoải mái. Freeship đơn từ 299k 🔥',
-      domain: 'verowwwear.com',
+      caption: 'New mens sports set — breathable fabric, relaxed fit. Free shipping over $29 🔥',
+      domain: 'verowwwear.example',
       headline: 'Sports T-Shirt Set — Premium',
     },
   },
   {
     label: 'Poster',
-    reference: { src: '/img/kq3.webp', alt: 'Ảnh mẫu ngành đồ gia dụng' },
-    product: { src: '/img/ao.webp', alt: 'Ảnh sản phẩm đồ gia dụng' },
-    result: { src: '/img/mau3.webp', alt: 'Ảnh kết quả ngành đồ gia dụng' },
+    reference: { src: '/img/kq3.webp', alt: 'Reference design for a sportswear poster' },
+    product: { src: '/img/ao.webp', alt: 'Product photo of a sportswear set' },
+    result: { src: '/img/mau3.webp', alt: 'Generated sportswear poster using the reference layout' },
     post: {
-      page: 'Thời trang thể thao',
-      caption: '🏸 Bộ sưu tập Tennis: Áo nhẹ bay, đánh thật hay.',
-      domain: 'dothethao.com',
-      headline: 'Set đồ thể thao Tennis',
+      page: 'Court & Club',
+      caption: '🏸 The Tennis collection: light on your shoulders, sharp on the court.',
+      domain: 'courtandclub.example',
+      headline: 'Tennis Performance Set',
     },
   },
 ];
@@ -162,7 +162,7 @@ const ResultFrame: React.FC<{ image: { src: string; alt: string } }> = ({ image 
       />
     ) : (
       <div className="aspect-[3/4] w-full overflow-hidden rounded-[0.9rem]">
-        <Placeholder label="Ảnh kết quả" />
+        <Placeholder label="Generated result" />
       </div>
     )}
   </div>
@@ -189,7 +189,7 @@ const FacebookPost: React.FC<{ sample: Sample }> = ({ sample }) => (
       <div className="min-w-0 flex-1">
         <p className="truncate text-xs font-semibold leading-tight">{sample.post.page}</p>
         <p className="flex items-center gap-1 text-[10px] leading-tight text-[#65676B]">
-          Được tài trợ
+          Sponsored
           <span>·</span>
           <svg className="h-2.5 w-2.5" fill="currentColor" viewBox="0 0 24 24" aria-hidden>
             <path d="M12 2a10 10 0 100 20 10 10 0 000-20zm0 2c1.2 0 2.3 1.9 2.8 4.5H9.2C9.7 5.9 10.8 4 12 4zM8.8 10.5h6.4a16 16 0 010 3H8.8a16 16 0 010-3zM12 20c-1.2 0-2.3-1.9-2.8-4.5h5.6C14.3 18.1 13.2 20 12 20z" />
@@ -206,7 +206,7 @@ const FacebookPost: React.FC<{ sample: Sample }> = ({ sample }) => (
     <p className="line-clamp-2 min-h-[2.25rem] px-3.5 pb-2.5 text-xs leading-snug">{sample.post.caption}</p>
 
     {/* Ảnh kết quả do hệ thống tạo ra */}
-    <SquareImage image={sample.result} label="Ảnh kết quả" />
+    <SquareImage image={sample.result} label="Generated result" />
 
     {/* Thanh liên kết kiểu quảng cáo */}
     <div className="flex items-center gap-2 bg-[#F0F2F5] px-3.5 py-2.5">
@@ -214,7 +214,7 @@ const FacebookPost: React.FC<{ sample: Sample }> = ({ sample }) => (
         <p className="truncate text-[9px] uppercase tracking-wide text-[#65676B]">{sample.post.domain}</p>
         <p className="truncate text-xs font-semibold leading-tight">{sample.post.headline}</p>
       </div>
-      <span className="shrink-0 rounded-md bg-[#E4E6EB] px-3 py-1.5 text-[11px] font-semibold">Mua ngay</span>
+      <span className="shrink-0 rounded-md bg-[#E4E6EB] px-3 py-1.5 text-[11px] font-semibold">Shop now</span>
     </div>
 
     {/* Lượt tương tác */}
@@ -228,12 +228,12 @@ const FacebookPost: React.FC<{ sample: Sample }> = ({ sample }) => (
         </span>
         <span className="ml-0.5">1,2K</span>
       </span>
-      <span>86 bình luận · 41 lượt chia sẻ</span>
+      <span>86 comments · 41 shares</span>
     </div>
 
     {/* Hàng nút cuối bài */}
     <div className="flex items-center justify-around px-2 py-2 text-[11px] font-semibold text-[#65676B]">
-      {['Thích', 'Bình luận', 'Chia sẻ'].map((action) => (
+      {['Like', 'Comment', 'Share'].map((action) => (
         <span key={action}>{action}</span>
       ))}
     </div>
@@ -272,8 +272,8 @@ const SampleSlide: React.FC<{ sample: Sample }> = ({ sample }) => (
       hẳn kết quả — đúng ngược với thứ tự quan trọng mà hình này muốn kể.
     */}
     <div className="mx-auto flex w-full max-w-[94vw] gap-2.5 sm:mx-0 sm:w-[10rem] sm:max-w-none sm:flex-col sm:gap-3 md:w-[11.5rem] lg:w-[9.5rem] xl:w-[12rem]">
-      <InputCard step={1} label="Ảnh mẫu" image={sample.reference} />
-      <InputCard step={2} label="Sản phẩm" image={sample.product} />
+      <InputCard step={1} label="Reference" image={sample.reference} />
+      <InputCard step={2} label="Product" image={sample.product} />
     </div>
 
     <AiConnector />
@@ -385,7 +385,7 @@ export const HeroShowcase: React.FC = () => {
         onBlur={() => setIsFocused(false)}
         onKeyDown={onKeyDown}
         aria-roledescription="carousel"
-        aria-label="Ảnh mẫu và kết quả theo từng ngành hàng — vuốt ngang hoặc dùng phím mũi tên để xem mẫu khác"
+        aria-label="Reference designs and results by industry — swipe sideways or use the arrow keys to browse"
         className="touch-pan-y rounded-3xl outline-none ring-brand-500/40 focus-visible:ring-2"
       >
         {/*
@@ -410,7 +410,7 @@ export const HeroShowcase: React.FC = () => {
                 key={sample.label}
                 role="group"
                 aria-roledescription="slide"
-                aria-label={`${sample.label} — mẫu ${slideIndex + 1} trên ${total}`}
+                aria-label={`${sample.label} — sample ${slideIndex + 1} of ${total}`}
                 aria-hidden={!isActive}
                 className={`col-start-1 row-start-1 transition-all duration-500 ease-out ${
                   isActive

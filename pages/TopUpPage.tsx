@@ -1,51 +1,78 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useCallback, useEffect, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Button } from '../components/Button';
 import { Alert, Badge, Card, EmptyState, PageLoader, TableWrap } from '../components/ui';
 import { useAuth } from '../context/AuthContext';
 import { api, ApiError } from '../lib/api';
-import { copyText } from '../lib/clipboard';
-import { countdown, formatDateTime, formatNumber, formatVnd, STATUS_LABEL } from '../lib/format';
+import { formatDateTime, formatNumber, formatUsd, formatUsdPrecise, STATUS_LABEL } from '../lib/format';
 import { modelShortName, pickBasisPackage, pickReferenceModel, roundedImageCount } from '../lib/imageEstimate';
-import { APP_HOME } from '../lib/routes';
-import type { BankInfo, Catalog, ModelOption, Order, TokenPackage } from '../types';
-
-const ORDER_POLL_MS = 5000;
+import { APP_HOME, POLICY } from '../lib/routes';
+import type { Catalog, ModelOption, Order, TokenPackage } from '../types';
 
 /**
- * Đơn hết hạn vẫn được coi là "đang chờ thanh toán" ở giao diện: nếu khách đã
- * chuyển khoản muộn, webhook vẫn xử lý nên phải để khách nhìn thấy kết quả.
+ * Nhịp hỏi lại server sau khi khách quay về từ Stripe.
+ *
+ * Webhook thường về trước cả khi trình duyệt chuyển hướng xong, nhưng không có
+ * gì bảo đảm điều đó — endpoint `/orders/:code` cũng tự hỏi thẳng Stripe mỗi lần
+ * được gọi, nên vòng lặp này vẫn kết thúc kể cả khi webhook chưa được cấu hình.
  */
+const ORDER_POLL_MS = 2500;
+
+/** Bỏ cuộc sau chừng này lượt hỏi — tránh quay vòng vô hạn nếu có gì đó hỏng. */
+const MAX_POLLS = 40;
+
 const isAwaitingPayment = (order: Order) => order.status === 'pending' || order.status === 'expired';
 
 export const TopUpPage: React.FC = () => {
   const { refreshUser } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
   const [activeOrder, setActiveOrder] = useState<Order | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [creatingId, setCreatingId] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
 
-  const load = async () => {
+  /** Mã đơn và kết quả Stripe đính vào thanh địa chỉ khi khách quay lại. */
+  const returnedOrder = searchParams.get('order');
+  const checkoutResult = searchParams.get('checkout');
+
+  const load = useCallback(async () => {
     const [catalogData, orderData] = await Promise.all([
       api.get<Catalog>('/catalog'),
       api.get<{ orders: Order[] }>('/orders?limit=20'),
     ]);
     setCatalog(catalogData);
     setOrders(orderData.orders);
-    setActiveOrder((current) => current ?? orderData.orders.find((order) => isAwaitingPayment(order)) ?? null);
-  };
-
-  useEffect(() => {
-    void load().catch((err) => setError(err instanceof ApiError ? err.message : 'Không tải được dữ liệu.'));
+    return orderData.orders;
   }, []);
 
-  // Hỏi server xem webhook đã xử lý đơn chưa.
+  useEffect(() => {
+    void load()
+      .then((list) => {
+        // Khách vừa từ Stripe quay về: mở thẳng đơn đó thay vì bảng giá.
+        if (returnedOrder) setActiveOrder(list.find((order) => order.code === returnedOrder) ?? null);
+      })
+      .catch((err) => setError(err instanceof ApiError ? err.message : 'Could not load this page.'));
+  }, [load, returnedOrder]);
+
+  /*
+   * Hỏi lại cho tới khi đơn thoát khỏi trạng thái chờ.
+   *
+   * Chỉ chạy cho đơn khách vừa thanh toán xong (`checkout=success`): với đơn còn
+   * dang dở mà khách chưa trả tiền thì không có gì để đợi, hỏi lặp lại chỉ làm
+   * phiền server.
+   */
   useEffect(() => {
     if (!activeOrder || !isAwaitingPayment(activeOrder)) return;
+    if (checkoutResult !== 'success') return;
 
+    let polls = 0;
     const timer = setInterval(() => {
       void (async () => {
+        if ((polls += 1) > MAX_POLLS) {
+          clearInterval(timer);
+          return;
+        }
         try {
           const data = await api.get<{ order: Order }>(`/orders/${activeOrder.code}`);
           setActiveOrder(data.order);
@@ -54,93 +81,112 @@ export const TopUpPage: React.FC = () => {
             await refreshUser();
           }
         } catch {
-          /* thử lại ở lần sau */
+          /* thử lại ở lượt sau */
         }
       })();
     }, ORDER_POLL_MS);
 
     return () => clearInterval(timer);
-  }, [activeOrder, refreshUser]);
+  }, [activeOrder, checkoutResult, refreshUser]);
 
-  /** Trả về true nếu đơn được tạo — nơi gọi dùng để biết có nên đóng hộp thoại không. */
-  const createOrder = async (path: string, body: unknown, key: string): Promise<boolean> => {
+  /** Dọn `?order=…&checkout=…` để tải lại trang không rơi lại vào màn kết quả. */
+  const clearReturnParams = () => setSearchParams({}, { replace: true });
+
+  /** Tạo đơn rồi chuyển thẳng sang trang thanh toán của Stripe. */
+  const buy = async (pkg: TokenPackage) => {
     setError(null);
-    setCreatingId(key);
+    setBusyId(`pkg-${pkg.id}`);
     try {
-      const data = await api.post<{ order: Order }>(path, body);
-      setActiveOrder(data.order);
-      setOrders((current) => [data.order, ...current]);
-      return true;
+      const data = await api.post<{ order: Order; checkoutUrl: string }>('/orders', { packageId: pkg.id });
+      window.location.href = data.checkoutUrl;
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Không tạo được đơn hàng.');
-      return false;
-    } finally {
-      setCreatingId(null);
+      setError(err instanceof ApiError ? err.message : 'Could not start the checkout.');
+      setBusyId(null);
     }
   };
 
-  const handleCancel = async (order: Order) => {
+  /** Mở lại phiên thanh toán của một đơn còn dang dở. */
+  const resume = async (order: Order) => {
+    setError(null);
+    setBusyId(`order-${order.id}`);
+    try {
+      const data = await api.post<{ checkoutUrl: string | null }>(`/orders/${order.code}/checkout`);
+      if (data.checkoutUrl) {
+        window.location.href = data.checkoutUrl;
+        return;
+      }
+      // Không có link nghĩa là đơn đã được thanh toán ở nơi khác — nạp lại cho khớp.
+      await load();
+      await refreshUser();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Could not reopen the checkout.');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const cancel = async (order: Order) => {
     try {
       await api.post(`/orders/${order.id}/cancel`);
       setActiveOrder(null);
+      clearReturnParams();
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Không huỷ được đơn.');
+      setError(err instanceof ApiError ? err.message : 'Could not cancel this order.');
     }
+  };
+
+  const backToPacks = () => {
+    setActiveOrder(null);
+    clearReturnParams();
   };
 
   if (!catalog) return <PageLoader />;
 
-  // Quy số điểm ra số ảnh — con số này dễ hình dung hơn nhiều so với "500.000
-  // điểm". Model mốc và cách làm tròn nằm ở lib/imageEstimate để trang này và
+  // Quy số điểm ra số ảnh — con số này dễ hình dung hơn nhiều so với "500,000
+  // credits". Model mốc và cách làm tròn nằm ở lib/imageEstimate để trang này và
   // bảng giá ở trang giới thiệu luôn ra cùng một con số cho cùng một gói.
   const referenceModel = pickReferenceModel(catalog.models);
 
   return (
     <div className="max-w-6xl mx-auto p-6 space-y-8">
       <div className="flex items-center justify-between gap-4">
-        <h1 className="text-2xl font-bold text-gray-100">Mua điểm</h1>
-        <Link
-          to="/chinh-sach"
-          className="text-sm text-gray-500 hover:text-brand-500 transition-colors whitespace-nowrap"
-        >
-          Chính sách &amp; Điều khoản →
+        <h1 className="text-2xl font-bold text-gray-100">Buy credits</h1>
+        <Link to={POLICY} className="text-sm text-gray-500 hover:text-brand-500 transition-colors whitespace-nowrap">
+          Terms &amp; policies →
         </Link>
       </div>
 
       {error && <Alert tone="error">{error}</Alert>}
 
-      {activeOrder && isAwaitingPayment(activeOrder) ? (
-        <PaymentPanel
+      {activeOrder && activeOrder.status === 'paid' ? (
+        <PaidPanel order={activeOrder} onContinue={backToPacks} />
+      ) : activeOrder && isAwaitingPayment(activeOrder) ? (
+        <PendingPanel
           order={activeOrder}
-          bank={catalog.bank}
-          onCancel={() => handleCancel(activeOrder)}
-          onBack={() => setActiveOrder(null)}
+          cancelled={checkoutResult === 'cancelled'}
+          busy={busyId === `order-${activeOrder.id}`}
+          onRetry={() => resume(activeOrder)}
+          onCancel={() => cancel(activeOrder)}
+          onBack={backToPacks}
         />
-      ) : activeOrder && activeOrder.status === 'paid' ? (
-        <PaidPanel order={activeOrder} onContinue={() => setActiveOrder(null)} />
       ) : (
         <>
           <BalanceStatus referenceModel={referenceModel} />
 
           <section>
             <div className="flex items-baseline justify-between gap-4 mb-3">
-              <h2 className="text-lg font-bold text-gray-100">Chọn gói điểm</h2>
-              <span className="text-xs text-gray-500">Không phí duy trì · điểm không hết hạn</span>
+              <h2 className="text-lg font-bold text-gray-100">Choose a credit pack</h2>
+              <span className="text-xs text-gray-500">No subscription · credits never expire</span>
             </div>
 
-            <PackageGrid
-              packages={catalog.packages}
-              creatingId={creatingId}
-              referenceModel={referenceModel}
-              onSelect={(pkg) => createOrder('/orders', { packageId: pkg.id }, `pkg-${pkg.id}`)}
-            />
+            <PackageGrid packages={catalog.packages} busyId={busyId} referenceModel={referenceModel} onSelect={buy} />
           </section>
         </>
       )}
 
       <PricingReference catalog={catalog} />
-      <OrderHistory orders={orders} onResume={setActiveOrder} />
+      <OrderHistory orders={orders} busyId={busyId} onResume={resume} />
     </div>
   );
 };
@@ -150,9 +196,9 @@ export const TopUpPage: React.FC = () => {
 /**
  * Số điểm đang có, quy ra số ảnh tạo được.
  *
- * Khối "hạn mức tháng" chỉ hiện với khách còn gói cũ chưa hết hạn. Khách mới
- * không bao giờ thấy nó — họ chưa từng nghe tới khái niệm hạn mức tháng, bày ra
- * một thanh tiến trình "0 / 0" chỉ khiến họ tưởng mình đang thiếu thứ gì đó.
+ * Khối hạn mức tháng chỉ hiện với khách còn gói cũ chưa hết hạn. Khách mới không
+ * bao giờ thấy nó — họ chưa từng nghe tới khái niệm đó, bày ra một dòng "0 / 0"
+ * chỉ khiến họ tưởng mình đang thiếu thứ gì.
  */
 const BalanceStatus: React.FC<{ referenceModel: ModelOption | null }> = ({ referenceModel }) => {
   const { user } = useAuth();
@@ -165,11 +211,11 @@ const BalanceStatus: React.FC<{ referenceModel: ModelOption | null }> = ({ refer
     <Card className="p-5">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="text-[11px] uppercase tracking-wider text-gray-500 font-bold">Điểm đang có</p>
+          <p className="text-[11px] uppercase tracking-wider text-gray-500 font-bold">Your balance</p>
           <p className="text-brand-500 font-bold text-2xl mt-1">{formatNumber(user.tokenBalance)}</p>
           {images > 0 && (
             <p className="text-[11px] text-gray-500 mt-1">
-              Tạo được khoảng {formatNumber(images)} ảnh {referenceModel?.resolution} với{' '}
+              About {formatNumber(images)} more {referenceModel?.resolution} images with{' '}
               {modelShortName(referenceModel)}
             </p>
           )}
@@ -177,7 +223,8 @@ const BalanceStatus: React.FC<{ referenceModel: ModelOption | null }> = ({ refer
 
         {user.tokenBalance === 0 && (
           <p className="text-sm text-gray-400 max-w-xs">
-            Chọn một gói bên dưới để nạp điểm. Chuyển khoản xong là dùng được ngay, không cần đăng ký gì thêm.
+            Pick a pack below to top up. Credits land in your account as soon as the payment clears — nothing else to set
+            up.
           </p>
         )}
       </div>
@@ -186,10 +233,10 @@ const BalanceStatus: React.FC<{ referenceModel: ModelOption | null }> = ({ refer
       {user.isSubscribed && user.monthlyAllowance > 0 && (
         <div className="mt-4 pt-4 border-t border-dark-800">
           <p className="text-[11px] text-gray-500">
-            Trong đó có <strong className="text-gray-400">{formatNumber(user.monthlyTokens)}</strong> điểm hạn mức từ gói
-            tháng cũ của bạn (còn hiệu lực tới {formatDateTime(user.subscriptionExpiresAt)}). Phần này được cấp lại vào{' '}
-            {formatDateTime(user.monthlyPeriodEnd)} và <strong className="text-gray-400">không cộng dồn</strong>. Điểm bạn
-            mua thêm thì không hết hạn.
+            That includes <strong className="text-gray-400">{formatNumber(user.monthlyTokens)}</strong> credits from your
+            legacy monthly plan (valid until {formatDateTime(user.subscriptionExpiresAt)}). That part resets on{' '}
+            {formatDateTime(user.monthlyPeriodEnd)} and <strong className="text-gray-400">does not roll over</strong>.
+            Credits you buy never expire.
           </p>
         </div>
       )}
@@ -199,11 +246,11 @@ const BalanceStatus: React.FC<{ referenceModel: ModelOption | null }> = ({ refer
 
 const PackageGrid: React.FC<{
   packages: TokenPackage[];
-  creatingId: string | null;
+  busyId: string | null;
   onSelect: (pkg: TokenPackage) => void;
   /** Model dùng làm mốc quy số điểm ra số ảnh */
   referenceModel: ModelOption | null;
-}> = ({ packages, creatingId, onSelect, referenceModel }) => {
+}> = ({ packages, busyId, onSelect, referenceModel }) => {
   return (
     <>
       {/*
@@ -228,20 +275,20 @@ const PackageGrid: React.FC<{
             >
               {pkg.isPopular && (
                 <span className="absolute -top-2.5 left-5 bg-brand-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
-                  Phổ biến nhất
+                  Most popular
                 </span>
               )}
 
-              <p className="text-xl font-bold text-gray-300">{formatVnd(pkg.priceVnd)}</p>
+              <p className="text-xl font-bold text-gray-300">{formatUsd(pkg.priceUsdCents)}</p>
 
               {/*
                 SỐ ĐIỂM là con số lớn nhất trên thẻ, không phải giá tiền: khách đã
                 biết mình định tiêu bao nhiêu, thứ họ cần so giữa các thẻ là đổi
                 được bao nhiêu điểm.
 
-                Số to LUÔN là tổng nhận được, phần thưởng ghi rõ là "đã gồm".
-                Trước đây để "550.000 điểm +50.000" cạnh nhau, đọc ra thành 550.000
-                cộng thêm 50.000 nữa = 600.000 — hứa gấp đôi phần thưởng thật.
+                Số to LUÔN là tổng nhận được, phần thưởng ghi rõ là "includes".
+                Trước đây để "550,000 credits +50,000" cạnh nhau, đọc ra thành
+                550.000 cộng thêm 50.000 nữa — hứa gấp đôi phần thưởng thật.
 
                 Khoá chiều cao tối thiểu vì thẻ có thưởng cao hơn thẻ không có đúng
                 một dòng; không khoá thì nét kẻ ngang bên dưới mỗi thẻ một độ cao.
@@ -249,29 +296,27 @@ const PackageGrid: React.FC<{
               <div className="mt-2 min-h-[3.5rem]">
                 <p className="text-[1.75rem] font-bold leading-none tracking-tight text-brand-500">
                   {formatNumber(pkg.totalTokens)}
-                  <span className="ml-1 text-xs font-semibold text-gray-500">điểm</span>
+                  <span className="ml-1 text-xs font-semibold text-gray-500">credits</span>
                 </p>
                 {pkg.bonusTokens > 0 && (
                   <p className="text-[11px] text-green-400 mt-1 leading-tight">
-                    Đã gồm {formatNumber(pkg.bonusTokens)} điểm thưởng
+                    Includes {formatNumber(pkg.bonusTokens)} bonus credits
                   </p>
                 )}
               </div>
 
               <div className="pt-3 border-t border-dark-800 flex-1">
-                {images > 0 && (
-                  <p className="text-xs font-bold text-gray-200">≈ {formatNumber(images)} ảnh</p>
-                )}
+                {images > 0 && <p className="text-xs font-bold text-gray-200">≈ {formatNumber(images)} images</p>}
                 {pkg.description && <p className="text-[11px] text-gray-500 mt-1.5">{pkg.description}</p>}
               </div>
 
               <Button
                 onClick={() => onSelect(pkg)}
-                isLoading={creatingId === `pkg-${pkg.id}`}
+                isLoading={busyId === `pkg-${pkg.id}`}
                 variant={pkg.isPopular ? 'primary' : 'secondary'}
                 className="w-full mt-3 !rounded-xl !py-2.5 !text-sm"
               >
-                Mua ngay
+                Buy now
               </Button>
             </Card>
           );
@@ -282,10 +327,9 @@ const PackageGrid: React.FC<{
         <p className="text-[11px] text-gray-600 mt-3">
           {/* Số điểm lấy từ bảng giá, không gõ tay — gõ tay là sớm muộn cũng
               lệch với con số thật khi bảng giá đổi. */}
-          Số ảnh tính theo <strong className="text-gray-500">{modelShortName(referenceModel)}</strong> ở{' '}
-          {referenceModel.resolution} (
-          {formatNumber(referenceModel.tokenCost)} điểm/ảnh). Chọn ảnh 1K sẽ được nhiều ảnh hơn, chọn 4K thì ít hơn; xem
-          bảng quy đổi bên dưới. Điểm đã mua không hết hạn.
+          Image counts assume <strong className="text-gray-500">{modelShortName(referenceModel)}</strong> at{' '}
+          {referenceModel.resolution} ({formatNumber(referenceModel.tokenCost)} credits per image). 1K images go further,
+          4K fewer — see the table below. Purchased credits never expire.
         </p>
       )}
     </>
@@ -294,159 +338,93 @@ const PackageGrid: React.FC<{
 
 const PaidPanel: React.FC<{ order: Order; onContinue: () => void }> = ({ order, onContinue }) => (
   <Card className="p-6 border-green-900/50 bg-green-500/5">
-    <h2 className="text-xl font-bold text-green-400">Thanh toán thành công!</h2>
+    <h2 className="text-xl font-bold text-green-400">Payment complete</h2>
     {order.orderType === 'subscription' ? (
       <p className="text-sm text-gray-300 mt-2">
-        Đơn <strong>{order.code}</strong> đã kích hoạt <strong className="text-gray-100">{order.packageName}</strong>. Bạn
-        có thể bắt đầu tạo ảnh ngay.
+        Order <strong>{order.code}</strong> activated <strong className="text-gray-100">{order.packageName}</strong>. You
+        can start generating right away.
       </p>
     ) : (
       <p className="text-sm text-gray-300 mt-2">
-        Đơn <strong>{order.code}</strong> đã cộng{' '}
-        <strong className="text-gray-100">{formatNumber(order.totalTokens)} điểm</strong> vào tài khoản.
+        Order <strong>{order.code}</strong> added{' '}
+        <strong className="text-gray-100">{formatNumber(order.totalTokens)} credits</strong> to your account.
       </p>
     )}
     <div className="flex gap-3 mt-5">
       <Link to={APP_HOME}>
-        <Button className="!rounded-xl">Bắt đầu tạo ảnh</Button>
+        <Button className="!rounded-xl">Start generating</Button>
       </Link>
       <Button variant="ghost" onClick={onContinue}>
-        Mua thêm điểm
+        Buy more credits
       </Button>
     </div>
   </Card>
 );
 
-const PaymentPanel: React.FC<{
+/**
+ * Đơn chưa thanh toán xong.
+ *
+ * Gộp ba tình huống vào một khối vì với khách chúng là cùng một câu chuyện "đơn
+ * này chưa xong": vừa bấm huỷ ở Stripe, vừa trả xong mà tiền chưa kịp về, hoặc
+ * mở lại một đơn cũ còn treo.
+ */
+const PendingPanel: React.FC<{
   order: Order;
-  bank: BankInfo;
+  cancelled: boolean;
+  busy: boolean;
+  onRetry: () => void;
   onCancel: () => void;
   onBack: () => void;
-}> = ({ order, bank, onCancel, onBack }) => {
-  const [now, setNow] = useState(Date.now());
-  const [copied, setCopied] = useState<string | null>(null);
-
-  useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(timer);
-  }, []);
-
-  const remaining = useMemo(() => countdown(order.expiresAt, now), [order.expiresAt, now]);
-
-  const copy = async (value: string, key: string) => {
-    // Qua `copyText` để còn chạy trên HTTP thuần, nơi `navigator.clipboard`
-    // không tồn tại — xem lib/clipboard.ts.
-    if (!(await copyText(value))) return; /* chép hỏng — khách vẫn đọc và gõ tay được */
-    setCopied(key);
-    setTimeout(() => setCopied(null), 1500);
-  };
-
-  const Row: React.FC<{ label: string; value: string; copyKey?: string; highlight?: boolean }> = ({
-    label,
-    value,
-    copyKey,
-    highlight,
-  }) => (
-    <div className="flex justify-between items-center gap-3 py-2.5 border-b border-dark-850 last:border-0">
-      <span className="text-xs text-gray-500 shrink-0">{label}</span>
-      <div className="flex items-center gap-2 min-w-0">
-        <span className={`text-sm truncate ${highlight ? 'font-bold text-brand-500' : 'text-gray-200'}`}>{value}</span>
-        {copyKey && (
-          <button
-            onClick={() => copy(value, copyKey)}
-            className="text-[10px] bg-dark-800 hover:bg-dark-700 text-gray-400 px-2 py-1 rounded shrink-0 transition-colors"
-          >
-            {copied === copyKey ? 'Đã chép' : 'Chép'}
-          </button>
-        )}
+}> = ({ order, cancelled, busy, onRetry, onCancel, onBack }) => (
+  <Card className="p-6">
+    <div className="flex items-start justify-between gap-4">
+      <div>
+        <h2 className="text-xl font-bold text-gray-100">
+          {cancelled ? 'Checkout cancelled' : 'Confirming your payment'}
+        </h2>
+        <p className="text-sm text-gray-500 mt-1">
+          {order.packageName} · {formatUsd(order.amountUsdCents)} · {formatNumber(order.totalTokens)} credits · order{' '}
+          <span className="font-mono">{order.code}</span>
+        </p>
       </div>
+      <button onClick={onBack} className="text-xs text-gray-500 hover:text-gray-100 whitespace-nowrap">
+        ← Back to packs
+      </button>
     </div>
-  );
 
-  return (
-    <Card className="p-6">
-      <div className="flex items-start justify-between gap-4 mb-5">
-        <div>
-          <h2 className="text-xl font-bold text-gray-100">Chuyển khoản để hoàn tất</h2>
-          <p className="text-sm text-gray-500 mt-1">
-            {order.orderType === 'subscription'
-              ? `${order.packageName} · ${order.subscriptionMonths} tháng`
-              : `${order.packageName} · nhận ${formatNumber(order.totalTokens)} điểm`}
-          </p>
-        </div>
-        <button onClick={onBack} className="text-xs text-gray-500 hover:text-gray-100 whitespace-nowrap">
-          ← Chọn gói điểm khác
-        </button>
+    {cancelled ? (
+      <p className="text-sm text-gray-400 mt-4">
+        You were not charged. This order is still open — pick up where you left off, or cancel it and choose a different
+        pack.
+      </p>
+    ) : (
+      <div className="flex items-center gap-2 mt-5 text-sm text-brand-500">
+        <span className="inline-block w-2 h-2 rounded-full bg-brand-500 animate-pulse" />
+        Waiting for the payment to clear. This usually takes a few seconds.
       </div>
+    )}
 
-      {!bank.configured && (
-        <Alert tone="warning">
-          Quản trị viên chưa cấu hình tài khoản ngân hàng nhận tiền (BANK_ACCOUNT_NUMBER trong file .env).
-        </Alert>
+    <div className="flex flex-wrap gap-3 mt-5">
+      <Button onClick={onRetry} isLoading={busy} className="!rounded-xl">
+        {cancelled ? 'Complete payment' : 'Reopen payment page'}
+      </Button>
+      {order.status === 'pending' && (
+        <Button variant="ghost" onClick={onCancel}>
+          Cancel order
+        </Button>
       )}
+    </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
-        <div className="flex flex-col items-center justify-center">
-          {order.qrUrl ? (
-            <>
-              <img
-                src={order.qrUrl}
-                alt="Mã QR chuyển khoản"
-                className="w-full max-w-[280px] rounded-xl border border-dark-700 bg-white"
-              />
-              <p className="text-[11px] text-gray-500 mt-3 text-center">
-                Quét bằng app ngân hàng — số tiền và nội dung đã điền sẵn.
-              </p>
-            </>
-          ) : (
-            <div className="w-full max-w-[280px] aspect-square rounded-xl border border-dashed border-dark-700 flex items-center justify-center text-xs text-gray-600 text-center p-6">
-              Chưa cấu hình tài khoản ngân hàng nên không tạo được mã QR.
-            </div>
-          )}
-        </div>
+    {!cancelled && (
+      <p className="text-[11px] text-gray-600 mt-4">
+        Paid but nothing happened yet? Come back to this page in a minute — payments are confirmed automatically, even if
+        you close the browser.
+      </p>
+    )}
+  </Card>
+);
 
-        <div>
-          <div className="bg-dark-850 rounded-xl px-4 divide-y divide-dark-800">
-            <Row label="Ngân hàng" value={bank.bankName || bank.bankCode} />
-            <Row label="Số tài khoản" value={bank.accountNumber} copyKey="account" />
-            <Row label="Chủ tài khoản" value={bank.accountName} />
-            <Row label="Số tiền" value={formatVnd(order.amountVnd)} copyKey="amount" highlight />
-            <Row label="Nội dung CK" value={order.transferContent} copyKey="content" highlight />
-          </div>
-
-          <Alert tone="warning">
-            <strong>Bắt buộc</strong> ghi đúng nội dung <strong>{order.transferContent}</strong> để hệ thống xử lý tự
-            động. Ghi sai vẫn được xử lý nhưng phải chờ quản trị viên duyệt tay.
-          </Alert>
-
-          <div className="flex items-center justify-between mt-4 text-xs">
-            <span className="text-gray-500">
-              {remaining ? (
-                <>
-                  Đơn hết hạn sau <strong className="text-amber-400">{remaining}</strong>
-                </>
-              ) : (
-                'Đơn đã quá hạn giữ chỗ — nếu bạn đã chuyển khoản thì vẫn được xử lý bình thường.'
-              )}
-            </span>
-            {order.status === 'pending' && (
-              <button onClick={onCancel} className="text-gray-500 hover:text-red-400 transition-colors">
-                Huỷ đơn
-              </button>
-            )}
-          </div>
-
-          <div className="flex items-center gap-2 mt-5 text-sm text-brand-500">
-            <span className="inline-block w-2 h-2 rounded-full bg-brand-500 animate-pulse" />
-            Đang chờ ngân hàng báo có...
-          </div>
-        </div>
-      </div>
-    </Card>
-  );
-};
-
-/** Bảng điểm tiêu hao mỗi ảnh, để khách ước lượng một gói điểm dùng được bao nhiêu ảnh. */
+/** Bảng điểm tiêu hao mỗi ảnh, để khách ước lượng một gói dùng được bao nhiêu ảnh. */
 const PricingReference: React.FC<{ catalog: Catalog }> = ({ catalog }) => {
   // Cột "số ảnh" tính theo gói mốc, và bảng nói rõ tên gói đó. Cách chọn gói mốc
   // nằm ở lib/imageEstimate để bảng model ở trang giới thiệu dùng đúng gói này.
@@ -454,35 +432,32 @@ const PricingReference: React.FC<{ catalog: Catalog }> = ({ catalog }) => {
   const baseTokens = basePackage?.totalTokens ?? 0;
 
   /**
-   * Đơn giá điểm để quy ảnh ra tiền — lấy đúng ĐƠN GIÁ CỦA GÓI MỐC.
+   * Đơn giá mỗi điểm (cent) để quy ảnh ra tiền — lấy đúng ĐƠN GIÁ CỦA GÓI MỐC.
    *
    * Trước đây chỗ này lấy đơn giá rẻ nhất trong tất cả các gói, trong khi cột
    * "số ảnh" bên cạnh lại tính theo gói mốc. Hai cột hai mốc khác nhau nên bảng
-   * tự mâu thuẫn: khách nhân "140 ảnh × 3.000đ" ra 420.000đ, không khớp với giá
-   * 499.000đ của chính gói ghi ở đầu cột.
+   * tự mâu thuẫn: khách nhân "500 ảnh × $0,10" ra $50 mà gói ghi ở đầu cột lại
+   * là giá khác.
    *
    * Cùng một gói cho cả hai cột thì phép nhân ngược lại luôn ra xấp xỉ giá gói,
-   * chênh chút ít do số ảnh đã làm tròn xuống.
+   * chênh chút ít do số ảnh đã làm tròn.
    */
-  const pricePerToken =
-    basePackage && basePackage.totalTokens > 0 ? basePackage.priceVnd / basePackage.totalTokens : 0;
-
-  // Làm tròn tới trăm đồng cho dễ đọc — đây là giá tham chiếu, không phải giá thu.
-  const equivalentPrice = (tokenCost: number) => Math.round((tokenCost * pricePerToken) / 100) * 100;
+  const centsPerToken =
+    basePackage && basePackage.totalTokens > 0 ? basePackage.priceUsdCents / basePackage.totalTokens : 0;
 
   return (
     <div>
-      <h2 className="text-lg font-bold text-gray-100 mb-3">Bảng quy đổi</h2>
+      <h2 className="text-lg font-bold text-gray-100 mb-3">Credit costs</h2>
       <Card className="p-4">
         <TableWrap>
           <thead>
             <tr className="text-[11px] uppercase tracking-wider text-gray-500 border-b border-dark-800">
               <th className="text-left font-bold py-2">Model</th>
-              <th className="text-left font-bold py-2">Chất lượng</th>
-              <th className="text-right font-bold py-2">Điểm / ảnh</th>
-              {pricePerToken > 0 && <th className="text-right font-bold py-2">Tiền / ảnh</th>}
+              <th className="text-left font-bold py-2">Quality</th>
+              <th className="text-right font-bold py-2">Credits / image</th>
+              {centsPerToken > 0 && <th className="text-right font-bold py-2">Cost / image</th>}
               {baseTokens > 0 && (
-                <th className="text-right font-bold py-2">Số ảnh với {basePackage?.name ?? 'gói mẫu'}</th>
+                <th className="text-right font-bold py-2">Images with {basePackage?.name ?? 'the sample pack'}</th>
               )}
             </tr>
           </thead>
@@ -492,17 +467,19 @@ const PricingReference: React.FC<{ catalog: Catalog }> = ({ catalog }) => {
                 <td className="py-2.5 text-gray-300">{model.label.split('—')[0].trim()}</td>
                 <td className="py-2.5 text-gray-400">{model.resolution}</td>
                 <td className="py-2.5 text-right text-brand-500 font-semibold">{formatNumber(model.tokenCost)}</td>
-                {pricePerToken > 0 && (
+                {centsPerToken > 0 && (
                   <td className="py-2.5 text-right text-gray-300">
-                    {model.tokenCost > 0 ? formatVnd(equivalentPrice(model.tokenCost)) : '—'}
+                    {model.tokenCost > 0 ? formatUsdPrecise(model.tokenCost * centsPerToken) : '—'}
                   </td>
                 )}
                 {baseTokens > 0 && (
                   <td className="py-2.5 text-right text-gray-500 text-xs">
                     {/* Dùng chung roundedImageCount với thẻ gói phía trên: cùng
-                        một trang mà thẻ ghi "tới 140 ảnh" còn bảng ghi "~147 ảnh"
+                        một trang mà thẻ ghi "≈ 500 images" còn bảng ghi "~512"
                         thì khách không biết tin con số nào. */}
-                    {model.tokenCost > 0 ? `~${formatNumber(roundedImageCount(baseTokens, model.tokenCost))} ảnh` : '—'}
+                    {model.tokenCost > 0
+                      ? `~${formatNumber(roundedImageCount(baseTokens, model.tokenCost))} images`
+                      : '—'}
                   </td>
                 )}
               </tr>
@@ -512,10 +489,9 @@ const PricingReference: React.FC<{ catalog: Catalog }> = ({ catalog }) => {
         <p className="text-[11px] text-gray-600 mt-3">
           {basePackage && baseTokens > 0 && (
             <>
-              Cả hai cột cuối đều tính theo <strong className="text-gray-500">{basePackage.name}</strong> (
-              {formatNumber(baseTokens)} điểm, {pricePerToken.toLocaleString('vi-VN', { maximumFractionDigits: 2 })}
-              đ/điểm), nếu chỉ dùng một loại ảnh duy nhất. Mua gói khác thì đơn giá mỗi điểm đổi theo bảng giá gói ở
-              trên, số ảnh tăng giảm tương ứng.
+              The last two columns assume the <strong className="text-gray-500">{basePackage.name}</strong> pack (
+              {formatNumber(baseTokens)} credits at {formatUsdPrecise(centsPerToken)} each) and a single image type. Other
+              packs shift the per-credit price, and the image counts move with it.
             </>
           )}
         </p>
@@ -524,22 +500,25 @@ const PricingReference: React.FC<{ catalog: Catalog }> = ({ catalog }) => {
   );
 };
 
-const OrderHistory: React.FC<{ orders: Order[]; onResume: (order: Order) => void }> = ({ orders, onResume }) => (
+const OrderHistory: React.FC<{
+  orders: Order[];
+  busyId: string | null;
+  onResume: (order: Order) => void;
+}> = ({ orders, busyId, onResume }) => (
   <div>
-    <h2 className="text-lg font-bold text-gray-100 mb-3">Lịch sử đơn hàng</h2>
+    <h2 className="text-lg font-bold text-gray-100 mb-3">Order history</h2>
     <Card className="p-4">
       {orders.length === 0 ? (
-        <EmptyState title="Chưa có đơn hàng nào." />
+        <EmptyState title="No orders yet." />
       ) : (
         <TableWrap>
           <thead>
             <tr className="text-[11px] uppercase tracking-wider text-gray-500 border-b border-dark-800">
-              <th className="text-left font-bold py-2">Mã đơn</th>
-              <th className="text-left font-bold py-2">Loại</th>
-              <th className="text-left font-bold py-2">Nội dung</th>
-              <th className="text-right font-bold py-2">Số tiền</th>
-              <th className="text-left font-bold py-2 pl-4">Trạng thái</th>
-              <th className="text-left font-bold py-2">Thời gian</th>
+              <th className="text-left font-bold py-2">Order</th>
+              <th className="text-left font-bold py-2">Item</th>
+              <th className="text-right font-bold py-2">Amount</th>
+              <th className="text-left font-bold py-2 pl-4">Status</th>
+              <th className="text-left font-bold py-2">Date</th>
               <th />
             </tr>
           </thead>
@@ -547,18 +526,13 @@ const OrderHistory: React.FC<{ orders: Order[]; onResume: (order: Order) => void
             {orders.map((order) => (
               <tr key={order.id} className="border-b border-dark-850 last:border-0">
                 <td className="py-2.5 font-mono text-xs text-gray-300">{order.code}</td>
-                <td className="py-2.5">
-                  <span className="text-[10px] uppercase tracking-wider text-gray-500 font-bold">
-                    {order.orderType === 'subscription' ? 'Gói tháng' : 'Điểm lẻ'}
-                  </span>
-                </td>
                 <td className="py-2.5 text-gray-300 text-xs">
                   {order.packageName}
                   {order.orderType === 'token_package' && (
                     <span className="text-brand-500 ml-2">+{formatNumber(order.totalTokens)}</span>
                   )}
                 </td>
-                <td className="py-2.5 text-right text-gray-300">{formatVnd(order.amountVnd)}</td>
+                <td className="py-2.5 text-right text-gray-300">{formatUsd(order.amountUsdCents)}</td>
                 <td className="py-2.5 pl-4">
                   <Badge status={order.status}>{STATUS_LABEL[order.status]}</Badge>
                 </td>
@@ -567,9 +541,10 @@ const OrderHistory: React.FC<{ orders: Order[]; onResume: (order: Order) => void
                   {order.status === 'pending' && (
                     <button
                       onClick={() => onResume(order)}
-                      className="text-xs text-brand-500 hover:underline whitespace-nowrap"
+                      disabled={busyId === `order-${order.id}`}
+                      className="text-xs text-brand-500 hover:underline whitespace-nowrap disabled:opacity-50"
                     >
-                      Thanh toán →
+                      Pay now →
                     </button>
                   )}
                 </td>

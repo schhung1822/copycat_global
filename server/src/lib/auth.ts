@@ -97,8 +97,8 @@ export async function attachUser(req: Request, _res: Response, next: NextFunctio
 export async function requireAuth(req: Request, _res: Response, next: NextFunction): Promise<void> {
   try {
     const user = req.user ?? (await loadUser(req));
-    if (!user) throw unauthorized('Phiên đăng nhập không hợp lệ hoặc đã hết hạn.');
-    if (user.status === 'banned') throw forbidden('Tài khoản của bạn đã bị khoá.');
+    if (!user) throw unauthorized('Your session is invalid or has expired.');
+    if (user.status === 'banned') throw forbidden('Your account has been suspended.');
     req.user = user;
     next();
   } catch (error) {

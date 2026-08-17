@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Button } from '../../components/Button';
 import { Alert, Card, EmptyState, Field, StatCard, TableWrap, inputClass, selectClass } from '../../components/ui';
 import { api, ApiError, qs } from '../../lib/api';
-import { formatDateTime, formatNumber, formatVnd } from '../../lib/format';
+import { formatDateTimeVi, formatNumberVi, formatUsd } from '../../lib/format';
 import type { AdminAffiliate, AdminCommission, AffiliateExample, AffiliateSettings, CommissionStatus } from '../../types';
 
 const COMMISSION_STATUS_LABEL: Record<CommissionStatus, string> = {
@@ -29,7 +29,7 @@ export const AffiliateTab: React.FC = () => {
   const [message, setMessage] = useState<{ tone: 'success' | 'error'; text: string } | null>(null);
   const [affiliates, setAffiliates] = useState<AdminAffiliate[] | null>(null);
   const [commissions, setCommissions] = useState<AdminCommission[]>([]);
-  const [totals, setTotals] = useState({ pendingVnd: 0, paidVnd: 0 });
+  const [totals, setTotals] = useState({ pendingUsdCents: 0, paidUsdCents: 0 });
   const [statusFilter, setStatusFilter] = useState('');
   const [affiliateFilter, setAffiliateFilter] = useState(0);
 
@@ -39,11 +39,11 @@ export const AffiliateTab: React.FC = () => {
   }, []);
 
   const loadCommissions = useCallback(async () => {
-    const data = await api.get<{ commissions: AdminCommission[]; pendingVnd: number; paidVnd: number }>(
+    const data = await api.get<{ commissions: AdminCommission[]; pendingUsdCents: number; paidUsdCents: number }>(
       `/admin/affiliate/commissions${qs({ status: statusFilter, affiliateId: affiliateFilter || '', limit: 50 })}`,
     );
     setCommissions(data.commissions);
-    setTotals({ pendingVnd: data.pendingVnd, paidVnd: data.paidVnd });
+    setTotals({ pendingUsdCents: data.pendingUsdCents, paidUsdCents: data.paidUsdCents });
   }, [statusFilter, affiliateFilter]);
 
   useEffect(() => {
@@ -63,7 +63,7 @@ export const AffiliateTab: React.FC = () => {
       await api.post(`/admin/affiliate/commissions/${row.id}/status`, { status });
       setMessage({
         tone: 'success',
-        text: `Đơn ${row.orderCode}: hoa hồng ${formatVnd(row.commissionVnd)} của ${row.affiliate.email} đã chuyển sang "${COMMISSION_STATUS_LABEL[status]}".`,
+        text: `Đơn ${row.orderCode}: hoa hồng ${formatUsd(row.commissionUsdCents)} của ${row.affiliate.email} đã chuyển sang "${COMMISSION_STATUS_LABEL[status]}".`,
       });
       await reloadAll();
     } catch (err) {
@@ -74,7 +74,7 @@ export const AffiliateTab: React.FC = () => {
   const payAll = async (affiliate: AdminAffiliate) => {
     if (
       !confirm(
-        `Đánh dấu đã chi trả toàn bộ ${formatVnd(affiliate.stats.pendingVnd)} hoa hồng đang chờ của ${affiliate.email}?\n\n` +
+        `Đánh dấu đã chi trả toàn bộ ${formatUsd(affiliate.stats.pendingUsdCents)} hoa hồng đang chờ của ${affiliate.email}?\n\n` +
           'Thao tác này chỉ ghi nhận trong hệ thống — tiền phải được chuyển bằng tay ở ngân hàng.',
       )
     ) {
@@ -82,12 +82,12 @@ export const AffiliateTab: React.FC = () => {
     }
 
     try {
-      const data = await api.post<{ count: number; amountVnd: number }>(
+      const data = await api.post<{ count: number; amountUsdCents: number }>(
         `/admin/affiliate/affiliates/${affiliate.id}/pay`,
       );
       setMessage({
         tone: 'success',
-        text: `Đã chốt ${data.count} khoản (${formatVnd(data.amountVnd)}) cho ${affiliate.email}.`,
+        text: `Đã chốt ${data.count} khoản (${formatUsd(data.amountUsdCents)}) cho ${affiliate.email}.`,
       });
       await reloadAll();
     } catch (err) {
@@ -95,9 +95,9 @@ export const AffiliateTab: React.FC = () => {
     }
   };
 
-  const totalPending = (affiliates ?? []).reduce((sum, item) => sum + item.stats.pendingVnd, 0);
-  const totalPaid = (affiliates ?? []).reduce((sum, item) => sum + item.stats.paidVnd, 0);
-  const totalRevenue = (affiliates ?? []).reduce((sum, item) => sum + item.stats.revenueVnd, 0);
+  const totalPending = (affiliates ?? []).reduce((sum, item) => sum + item.stats.pendingUsdCents, 0);
+  const totalPaid = (affiliates ?? []).reduce((sum, item) => sum + item.stats.paidUsdCents, 0);
+  const totalRevenue = (affiliates ?? []).reduce((sum, item) => sum + item.stats.revenueUsdCents, 0);
   const totalReferrals = (affiliates ?? []).reduce((sum, item) => sum + item.stats.referrals, 0);
 
   return (
@@ -107,16 +107,16 @@ export const AffiliateTab: React.FC = () => {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           label="Đang nợ cộng tác viên"
-          value={formatVnd(totalPending)}
+          value={formatUsd(totalPending)}
           sub="hoa hồng chưa chi trả"
           tone={totalPending > 0 ? 'warning' : 'default'}
         />
-        <StatCard label="Đã chi trả" value={formatVnd(totalPaid)} sub="tổng từ trước tới nay" />
-        <StatCard label="Doanh thu từ giới thiệu" value={formatVnd(totalRevenue)} sub="các đơn có người giới thiệu" />
+        <StatCard label="Đã chi trả" value={formatUsd(totalPaid)} sub="tổng từ trước tới nay" />
+        <StatCard label="Doanh thu từ giới thiệu" value={formatUsd(totalRevenue)} sub="các đơn có người giới thiệu" />
         <StatCard
           label="Khách đến từ link"
-          value={formatNumber(totalReferrals)}
-          sub={`${formatNumber(affiliates?.length ?? 0)} cộng tác viên`}
+          value={formatNumberVi(totalReferrals)}
+          sub={`${formatNumberVi(affiliates?.length ?? 0)} cộng tác viên`}
         />
       </div>
 
@@ -160,18 +160,18 @@ export const AffiliateTab: React.FC = () => {
                     )}
                   </td>
                   <td className="py-2.5 text-right text-gray-300">
-                    {formatNumber(row.stats.referrals)}
-                    <p className="text-[10px] text-gray-600">{formatNumber(row.stats.payingReferrals)} đã mua</p>
+                    {formatNumberVi(row.stats.referrals)}
+                    <p className="text-[10px] text-gray-600">{formatNumberVi(row.stats.payingReferrals)} đã mua</p>
                   </td>
-                  <td className="py-2.5 text-right text-gray-300">{formatVnd(row.stats.revenueVnd)}</td>
+                  <td className="py-2.5 text-right text-gray-300">{formatUsd(row.stats.revenueUsdCents)}</td>
                   <td
                     className={`py-2.5 text-right font-semibold ${
-                      row.stats.pendingVnd > 0 ? 'text-amber-400' : 'text-gray-600'
+                      row.stats.pendingUsdCents > 0 ? 'text-amber-400' : 'text-gray-600'
                     }`}
                   >
-                    {formatVnd(row.stats.pendingVnd)}
+                    {formatUsd(row.stats.pendingUsdCents)}
                   </td>
-                  <td className="py-2.5 text-right text-gray-400">{formatVnd(row.stats.paidVnd)}</td>
+                  <td className="py-2.5 text-right text-gray-400">{formatUsd(row.stats.paidUsdCents)}</td>
                   <td className="py-2.5 text-right whitespace-nowrap">
                     <button
                       onClick={() => setAffiliateFilter(affiliateFilter === row.id ? 0 : row.id)}
@@ -215,8 +215,8 @@ export const AffiliateTab: React.FC = () => {
             </button>
           )}
           <span className="ml-auto text-xs text-gray-500">
-            Chờ trả <strong className="text-amber-400">{formatVnd(totals.pendingVnd)}</strong> · đã trả{' '}
-            <strong className="text-gray-300">{formatVnd(totals.paidVnd)}</strong>
+            Chờ trả <strong className="text-amber-400">{formatUsd(totals.pendingUsdCents)}</strong> · đã trả{' '}
+            <strong className="text-gray-300">{formatUsd(totals.paidUsdCents)}</strong>
           </span>
         </div>
 
@@ -239,22 +239,22 @@ export const AffiliateTab: React.FC = () => {
             <tbody>
               {commissions.map((row) => (
                 <tr key={row.id} className="border-b border-dark-850 last:border-0 align-top">
-                  <td className="py-2.5 text-xs text-gray-500 whitespace-nowrap">{formatDateTime(row.createdAt)}</td>
+                  <td className="py-2.5 text-xs text-gray-500 whitespace-nowrap">{formatDateTimeVi(row.createdAt)}</td>
                   <td className="py-2.5 text-xs text-gray-300">{row.affiliate.email}</td>
                   <td className="py-2.5">
                     <p className="text-xs text-gray-400">{row.customer.email}</p>
                     <p className="text-[10px] text-gray-600 font-mono">{row.orderCode}</p>
                   </td>
-                  <td className="py-2.5 text-right text-gray-300">{formatVnd(row.revenueVnd)}</td>
+                  <td className="py-2.5 text-right text-gray-300">{formatUsd(row.revenueUsdCents)}</td>
                   <td className="py-2.5 text-right text-gray-500 text-xs">
-                    {formatVnd(row.tokenCostVnd + row.fixedCostVnd)}
-                    {row.fixedCostVnd > 0 && (
-                      <p className="text-[10px] text-gray-600">gồm CP cố định {formatVnd(row.fixedCostVnd)}</p>
+                    {formatUsd(row.tokenCostUsdCents + row.fixedCostUsdCents)}
+                    {row.fixedCostUsdCents > 0 && (
+                      <p className="text-[10px] text-gray-600">gồm CP cố định {formatUsd(row.fixedCostUsdCents)}</p>
                     )}
                   </td>
-                  <td className="py-2.5 text-right text-gray-400">{formatVnd(row.profitVnd)}</td>
+                  <td className="py-2.5 text-right text-gray-400">{formatUsd(row.profitUsdCents)}</td>
                   <td className="py-2.5 text-right">
-                    <span className="font-semibold text-brand-500">{formatVnd(row.commissionVnd)}</span>
+                    <span className="font-semibold text-brand-500">{formatUsd(row.commissionUsdCents)}</span>
                     <p className="mt-1">
                       <span
                         className={`text-[10px] font-bold px-2 py-0.5 rounded-full border whitespace-nowrap ${
@@ -317,7 +317,7 @@ const SettingsCard: React.FC<{
 }> = ({ onSaved, onMessage }) => {
   const [settings, setSettings] = useState<AffiliateSettings | null>(null);
   const [example, setExample] = useState<AffiliateExample | null>(null);
-  const [form, setForm] = useState({ commissionPercent: '', fixedCostVnd: '', fixedCostPercent: '' });
+  const [form, setForm] = useState({ commissionPercent: '', fixedCostDollars: '', fixedCostPercent: '' });
   const [enabled, setEnabled] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -330,7 +330,7 @@ const SettingsCard: React.FC<{
     setEnabled(data.settings.enabled);
     setForm({
       commissionPercent: String(data.settings.commissionPercent),
-      fixedCostVnd: String(data.settings.fixedCostVnd),
+      fixedCostDollars: (data.settings.fixedCostUsdCents / 100).toFixed(2),
       fixedCostPercent: String(data.settings.fixedCostPercent),
     });
   }, []);
@@ -343,13 +343,14 @@ const SettingsCard: React.FC<{
     event.preventDefault();
 
     const percent = Number(form.commissionPercent);
-    const fixedVnd = Number(form.fixedCostVnd);
+    // Admin gõ bằng đô-la, hệ thống lưu bằng cent — xem chú thích ở PricingTab.
+    const fixedCents = Math.round(Number(form.fixedCostDollars) * 100);
     const fixedPercent = Number(form.fixedCostPercent);
 
     if (!Number.isFinite(percent) || percent < 0 || percent > 100) {
       return onMessage({ tone: 'error', text: 'Tỉ lệ hoa hồng phải nằm trong khoảng 0 – 100%.' });
     }
-    if (!Number.isFinite(fixedVnd) || fixedVnd < 0) {
+    if (!Number.isFinite(fixedCents) || fixedCents < 0) {
       return onMessage({ tone: 'error', text: 'Chi phí cố định mỗi đơn phải là số không âm.' });
     }
     if (!Number.isFinite(fixedPercent) || fixedPercent < 0 || fixedPercent > 100) {
@@ -361,7 +362,7 @@ const SettingsCard: React.FC<{
       await api.patch('/admin/affiliate/settings', {
         enabled,
         commissionPercent: percent,
-        fixedCostVnd: fixedVnd,
+        fixedCostUsdCents: fixedCents,
         fixedCostPercent: fixedPercent,
       });
       await load();
@@ -397,8 +398,8 @@ const SettingsCard: React.FC<{
           <Field label="Tỉ lệ hoa hồng (%)" hint="Phần trăm trên lợi nhuận của mỗi đơn.">
             <input className={inputClass} inputMode="decimal" {...field('commissionPercent')} />
           </Field>
-          <Field label="Chi phí cố định mỗi đơn (đ)" hint="Phí cổng thanh toán, phí xử lý... trừ thẳng vào từng đơn.">
-            <input className={inputClass} inputMode="numeric" {...field('fixedCostVnd')} />
+          <Field label="Chi phí cố định mỗi đơn ($)" hint="Phí Stripe, phí xử lý... trừ thẳng vào từng đơn.">
+            <input className={inputClass} inputMode="decimal" {...field('fixedCostDollars')} />
           </Field>
           <Field label="Chi phí cố định theo doanh thu (%)" hint="Hạ tầng, nhân sự, marketing... phân bổ theo doanh thu.">
             <input className={inputClass} inputMode="decimal" {...field('fixedCostPercent')} />
@@ -424,14 +425,14 @@ const SettingsCard: React.FC<{
         {example && (
           <div className="rounded-xl border border-dark-800 bg-dark-950/60 px-4 py-3 text-[11px] text-gray-500 leading-relaxed">
             <strong className="text-gray-400">Ví dụ theo cấu hình đang áp dụng</strong> — gói{' '}
-            <strong className="text-gray-300">{example.packageName}</strong> ({formatNumber(example.tokens)} điểm):
+            <strong className="text-gray-300">{example.packageName}</strong> ({formatNumberVi(example.tokens)} điểm):
             <br />
-            {formatVnd(example.revenueVnd)} doanh thu − {formatVnd(example.tokenCostVnd)} giá vốn điểm
-            {example.fixedCostVnd > 0 && <> − {formatVnd(example.fixedCostVnd)} chi phí cố định</>} ={' '}
-            <strong className="text-gray-300">{formatVnd(example.profitVnd)}</strong> lợi nhuận → cộng tác viên nhận{' '}
-            <strong className="text-brand-500">{formatVnd(example.commissionVnd)}</strong> ({example.commissionPercent}
+            {formatUsd(example.revenueUsdCents)} doanh thu − {formatUsd(example.tokenCostUsdCents)} giá vốn điểm
+            {example.fixedCostUsdCents > 0 && <> − {formatUsd(example.fixedCostUsdCents)} chi phí cố định</>} ={' '}
+            <strong className="text-gray-300">{formatUsd(example.profitUsdCents)}</strong> lợi nhuận → cộng tác viên nhận{' '}
+            <strong className="text-brand-500">{formatUsd(example.commissionUsdCents)}</strong> ({example.commissionPercent}
             %).
-            {example.profitVnd <= 0 && (
+            {example.profitUsdCents <= 0 && (
               <span className="block mt-1 text-amber-400">
                 Lợi nhuận không dương nên đơn kiểu này không sinh hoa hồng. Kiểm tra lại chi phí cố định.
               </span>

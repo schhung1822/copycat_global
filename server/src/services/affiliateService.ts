@@ -14,7 +14,7 @@ import { badRequest } from '../lib/errors.js';
 export const AFFILIATE_SETTING_KEYS = {
   enabled: 'affiliate_enabled',
   commissionPercent: 'affiliate_commission_percent',
-  fixedCostVnd: 'affiliate_fixed_cost_vnd',
+  fixedCostUsdCents: 'affiliate_fixed_cost_usd_cents',
   fixedCostPercent: 'affiliate_fixed_cost_percent',
 } as const;
 
@@ -22,8 +22,8 @@ export const AFFILIATE_DEFAULTS = {
   enabled: true,
   /** Hoa hồng mặc định: 40% lợi nhuận của đơn. */
   commissionPercent: 40,
-  /** Chi phí cố định trừ thẳng trên mỗi đơn (phí cổng thanh toán, phí xử lý...). */
-  fixedCostVnd: 0,
+  /** Chi phí cố định trừ thẳng trên mỗi đơn, tính bằng cent (phí Stripe, phí xử lý...). */
+  fixedCostUsdCents: 0,
   /** Chi phí cố định phân bổ theo % doanh thu (hạ tầng, nhân sự, marketing...). */
   fixedCostPercent: 0,
 };
@@ -31,19 +31,21 @@ export const AFFILIATE_DEFAULTS = {
 export interface AffiliateSettings {
   enabled: boolean;
   commissionPercent: number;
-  fixedCostVnd: number;
+  fixedCostUsdCents: number;
   fixedCostPercent: number;
 }
 
 /**
- * Giá vốn của một điểm, tính bằng đồng.
+ * Giá vốn của N điểm, tính bằng cent (làm tròn tới cent gần nhất).
  *
- * Quy ước xuyên suốt hệ thống là **1 điểm = 1đ giá vốn nhà cung cấp** (xem đầu
- * file `seed.ts`), nên số điểm đã giao cho khách chính là chi phí biến đổi của
- * đơn. Ghi nhận giá vốn ngay lúc bán — thay vì đợi khách thật sự tạo ảnh — để
- * hoa hồng chốt được cùng lúc với đơn hàng và không phải tính lại về sau.
+ * Quy ước xuyên suốt hệ thống là **CREDITS_PER_USD điểm = $1 giá vốn nhà cung
+ * cấp** (xem env.ts và đầu file `seed.ts`), nên số điểm đã giao cho khách chính
+ * là chi phí biến đổi của đơn. Ghi nhận giá vốn ngay lúc bán — thay vì đợi khách
+ * thật sự tạo ảnh — để hoa hồng chốt được cùng lúc với đơn hàng và không phải
+ * tính lại về sau.
  */
-export const TOKEN_COST_VND = 1;
+export const creditCostUsdCents = (tokens: number): number =>
+  Math.round((Math.max(tokens, 0) * 100) / env.creditsPerUsd);
 
 const toNumber = (value: unknown, fallback: number): number => {
   const parsed = Number(value);
@@ -69,7 +71,9 @@ export async function readAffiliateSettings(conn?: PoolConnection): Promise<Affi
   return {
     enabled: raw === null || raw === undefined ? AFFILIATE_DEFAULTS.enabled : ['1', 'true', 'yes', 'on'].includes(raw),
     commissionPercent: toNumber(map.get(AFFILIATE_SETTING_KEYS.commissionPercent), AFFILIATE_DEFAULTS.commissionPercent),
-    fixedCostVnd: Math.round(toNumber(map.get(AFFILIATE_SETTING_KEYS.fixedCostVnd), AFFILIATE_DEFAULTS.fixedCostVnd)),
+    fixedCostUsdCents: Math.round(
+      toNumber(map.get(AFFILIATE_SETTING_KEYS.fixedCostUsdCents), AFFILIATE_DEFAULTS.fixedCostUsdCents),
+    ),
     fixedCostPercent: toNumber(map.get(AFFILIATE_SETTING_KEYS.fixedCostPercent), AFFILIATE_DEFAULTS.fixedCostPercent),
   };
 }
@@ -86,11 +90,11 @@ export async function saveAffiliateSettings(patch: Partial<AffiliateSettings>): 
     writes.push([AFFILIATE_SETTING_KEYS.commissionPercent, String(Math.round(patch.commissionPercent * 100) / 100)]);
   }
 
-  if (patch.fixedCostVnd !== undefined) {
-    if (!Number.isFinite(patch.fixedCostVnd) || patch.fixedCostVnd < 0) {
+  if (patch.fixedCostUsdCents !== undefined) {
+    if (!Number.isFinite(patch.fixedCostUsdCents) || patch.fixedCostUsdCents < 0) {
       throw badRequest('Chi phí cố định mỗi đơn phải là số không âm.');
     }
-    writes.push([AFFILIATE_SETTING_KEYS.fixedCostVnd, String(Math.round(patch.fixedCostVnd))]);
+    writes.push([AFFILIATE_SETTING_KEYS.fixedCostUsdCents, String(Math.round(patch.fixedCostUsdCents))]);
   }
 
   if (patch.fixedCostPercent !== undefined) {
@@ -116,12 +120,12 @@ export async function saveAffiliateSettings(patch: Partial<AffiliateSettings>): 
 // ---------------------------------------------------------------------------
 
 export interface CommissionBreakdown {
-  revenueVnd: number;
-  tokenCostVnd: number;
-  fixedCostVnd: number;
-  profitVnd: number;
+  revenueUsdCents: number;
+  tokenCostUsdCents: number;
+  fixedCostUsdCents: number;
+  profitUsdCents: number;
   commissionPercent: number;
-  commissionVnd: number;
+  commissionUsdCents: number;
 }
 
 /**
@@ -134,21 +138,22 @@ export interface CommissionBreakdown {
  * bằng 0 chứ không phải số âm — không đi đòi tiền affiliate vì một đơn lỗ.
  */
 export function computeCommission(
-  input: { revenueVnd: number; tokensDelivered: number },
+  input: { revenueUsdCents: number; tokensDelivered: number },
   settings: AffiliateSettings,
 ): CommissionBreakdown {
-  const revenueVnd = Math.max(Math.round(input.revenueVnd), 0);
-  const tokenCostVnd = Math.max(Math.round(input.tokensDelivered * TOKEN_COST_VND), 0);
-  const fixedCostVnd = Math.round((revenueVnd * settings.fixedCostPercent) / 100) + settings.fixedCostVnd;
-  const profitVnd = revenueVnd - tokenCostVnd - fixedCostVnd;
+  const revenueUsdCents = Math.max(Math.round(input.revenueUsdCents), 0);
+  const tokenCostUsdCents = creditCostUsdCents(input.tokensDelivered);
+  const fixedCostUsdCents =
+    Math.round((revenueUsdCents * settings.fixedCostPercent) / 100) + settings.fixedCostUsdCents;
+  const profitUsdCents = revenueUsdCents - tokenCostUsdCents - fixedCostUsdCents;
 
   return {
-    revenueVnd,
-    tokenCostVnd,
-    fixedCostVnd,
-    profitVnd,
+    revenueUsdCents,
+    tokenCostUsdCents,
+    fixedCostUsdCents,
+    profitUsdCents,
     commissionPercent: settings.commissionPercent,
-    commissionVnd: profitVnd > 0 ? Math.round((profitVnd * settings.commissionPercent) / 100) : 0,
+    commissionUsdCents: profitUsdCents > 0 ? Math.round((profitUsdCents * settings.commissionPercent) / 100) : 0,
   };
 }
 
@@ -290,12 +295,12 @@ export interface CommissionRow extends RowDataPacket {
   referred_user_id: number;
   order_id: number;
   order_code: string;
-  revenue_vnd: number;
-  token_cost_vnd: number;
-  fixed_cost_vnd: number;
-  profit_vnd: number;
+  revenue_usd_cents: number;
+  token_cost_usd_cents: number;
+  fixed_cost_usd_cents: number;
+  profit_usd_cents: number;
   commission_percent: number;
-  commission_vnd: number;
+  commission_usd_cents: number;
   status: 'pending' | 'paid' | 'cancelled';
   paid_at: Date | null;
   note: string | null;
@@ -314,7 +319,7 @@ export interface CommissionRow extends RowDataPacket {
  */
 export async function recordOrderCommission(
   conn: PoolConnection,
-  order: { id: number; code: string; user_id: number; amount_vnd: number; total_tokens: number },
+  order: { id: number; code: string; user_id: number; amount_usd_cents: number; total_tokens: number },
 ): Promise<number | null> {
   const settings = await readAffiliateSettings(conn);
   if (!settings.enabled) return null;
@@ -335,30 +340,30 @@ export async function recordOrderCommission(
   if (!affiliates[0] || affiliates[0].is_affiliate !== 1) return null;
 
   const breakdown = computeCommission(
-    { revenueVnd: order.amount_vnd, tokensDelivered: order.total_tokens },
+    { revenueUsdCents: order.amount_usd_cents, tokensDelivered: order.total_tokens },
     settings,
   );
 
   const [result] = await conn.query<ResultSetHeader>(
     `INSERT IGNORE INTO affiliate_commissions
-       (affiliate_user_id, referred_user_id, order_id, order_code, revenue_vnd, token_cost_vnd,
-        fixed_cost_vnd, profit_vnd, commission_percent, commission_vnd)
+       (affiliate_user_id, referred_user_id, order_id, order_code, revenue_usd_cents, token_cost_usd_cents,
+        fixed_cost_usd_cents, profit_usd_cents, commission_percent, commission_usd_cents)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       affiliateId,
       order.user_id,
       order.id,
       order.code,
-      breakdown.revenueVnd,
-      breakdown.tokenCostVnd,
-      breakdown.fixedCostVnd,
-      breakdown.profitVnd,
+      breakdown.revenueUsdCents,
+      breakdown.tokenCostUsdCents,
+      breakdown.fixedCostUsdCents,
+      breakdown.profitUsdCents,
       breakdown.commissionPercent,
-      breakdown.commissionVnd,
+      breakdown.commissionUsdCents,
     ],
   );
 
-  return result.affectedRows > 0 ? breakdown.commissionVnd : null;
+  return result.affectedRows > 0 ? breakdown.commissionUsdCents : null;
 }
 
 // ---------------------------------------------------------------------------
@@ -369,16 +374,16 @@ export interface AffiliateStats {
   referrals: number;
   payingReferrals: number;
   orders: number;
-  revenueVnd: number;
-  profitVnd: number;
-  commissionVnd: number;
-  pendingVnd: number;
+  revenueUsdCents: number;
+  profitUsdCents: number;
+  commissionUsdCents: number;
+  pendingUsdCents: number;
   /**
-   * Số khoản đang chờ, tách khỏi `pendingVnd`: đơn không có lãi sinh ra khoản
-   * hoa hồng 0đ vẫn cần được chốt sổ, mà nhìn vào số tiền thì không thấy chúng.
+   * Số khoản đang chờ, tách khỏi `pendingUsdCents`: đơn không có lãi sinh ra
+   * khoản hoa hồng $0 vẫn cần được chốt sổ, mà nhìn vào số tiền thì không thấy chúng.
    */
   pendingCount: number;
-  paidVnd: number;
+  paidUsdCents: number;
 }
 
 const num = (value: unknown): number => Number(value ?? 0) || 0;
@@ -394,12 +399,12 @@ export async function readAffiliateStats(affiliateId: number): Promise<Affiliate
     `SELECT
        COUNT(*)                                                           AS orders,
        COUNT(DISTINCT referred_user_id)                                   AS paying_referrals,
-       COALESCE(SUM(revenue_vnd), 0)                                      AS revenue,
-       COALESCE(SUM(profit_vnd), 0)                                       AS profit,
-       COALESCE(SUM(commission_vnd), 0)                                   AS commission,
-       COALESCE(SUM(CASE WHEN status = 'pending' THEN commission_vnd END), 0) AS pending,
+       COALESCE(SUM(revenue_usd_cents), 0)                                AS revenue,
+       COALESCE(SUM(profit_usd_cents), 0)                                 AS profit,
+       COALESCE(SUM(commission_usd_cents), 0)                             AS commission,
+       COALESCE(SUM(CASE WHEN status = 'pending' THEN commission_usd_cents END), 0) AS pending,
        COALESCE(SUM(status = 'pending'), 0)                               AS pending_count,
-       COALESCE(SUM(CASE WHEN status = 'paid'    THEN commission_vnd END), 0) AS paid
+       COALESCE(SUM(CASE WHEN status = 'paid'    THEN commission_usd_cents END), 0) AS paid
      FROM affiliate_commissions
      WHERE affiliate_user_id = ? AND status <> 'cancelled'`,
     [affiliateId],
@@ -409,24 +414,24 @@ export async function readAffiliateStats(affiliateId: number): Promise<Affiliate
     referrals: num(referrals?.total),
     payingReferrals: num(commissions?.paying_referrals),
     orders: num(commissions?.orders),
-    revenueVnd: num(commissions?.revenue),
-    profitVnd: num(commissions?.profit),
-    commissionVnd: num(commissions?.commission),
-    pendingVnd: num(commissions?.pending),
+    revenueUsdCents: num(commissions?.revenue),
+    profitUsdCents: num(commissions?.profit),
+    commissionUsdCents: num(commissions?.commission),
+    pendingUsdCents: num(commissions?.pending),
     pendingCount: num(commissions?.pending_count),
-    paidVnd: num(commissions?.paid),
+    paidUsdCents: num(commissions?.paid),
   };
 }
 
 export const serializeCommission = (row: CommissionRow) => ({
   id: row.id,
   orderCode: row.order_code,
-  revenueVnd: num(row.revenue_vnd),
-  tokenCostVnd: num(row.token_cost_vnd),
-  fixedCostVnd: num(row.fixed_cost_vnd),
-  profitVnd: num(row.profit_vnd),
+  revenueUsdCents: num(row.revenue_usd_cents),
+  tokenCostUsdCents: num(row.token_cost_usd_cents),
+  fixedCostUsdCents: num(row.fixed_cost_usd_cents),
+  profitUsdCents: num(row.profit_usd_cents),
   commissionPercent: Number(row.commission_percent),
-  commissionVnd: num(row.commission_vnd),
+  commissionUsdCents: num(row.commission_usd_cents),
   status: row.status,
   paidAt: row.paid_at,
   note: row.note,

@@ -1,7 +1,23 @@
 # Design Copycat AI
 
 Nền tảng tạo ảnh marketing bằng AI theo mô hình **trả trước bằng điểm**: khách đăng ký tài
-khoản → nạp tiền qua chuyển khoản → nhận điểm → dùng điểm để tạo ảnh.
+khoản → thanh toán bằng thẻ qua **Stripe** → nhận điểm → dùng điểm để tạo ảnh.
+
+> **Bản quốc tế.** Toàn bộ giao diện phía khách hàng viết bằng **tiếng Anh**, giá niêm yết
+> bằng **USD**, thu tiền qua **Stripe Checkout**. Riêng **trang Quản trị giữ nguyên tiếng
+> Việt** — đó là khu vực nội bộ, người vận hành là người Việt.
+>
+> Ranh giới này là quy ước của dự án, không phải ngẫu nhiên:
+>
+> | Nơi | Ngôn ngữ |
+> |---|---|
+> | Trang giới thiệu, Studio, Ví điểm, Mua điểm, Chính sách, Affiliate | Tiếng Anh |
+> | Thông báo lỗi API trả cho khách, mail đặt lại mật khẩu | Tiếng Anh |
+> | Trang Quản trị (`/quan-tri`), log khởi động, chú thích trong mã nguồn | Tiếng Việt |
+>
+> Hai bộ hàm định dạng riêng trong [lib/format.ts](lib/format.ts) giữ ranh giới đó:
+> `formatNumber`/`formatDateTime`/`STATUS_LABEL` cho khách, `formatNumberVi`/
+> `formatDateTimeVi`/`STATUS_LABEL_VI` cho quản trị.
 
 Trước đây ứng dụng chỉ có phần web gọi thẳng API Kie.ai bằng key nhúng sẵn trong mã nguồn.
 Bản này bổ sung backend, cơ sở dữ liệu và toàn bộ luồng kinh doanh; API key của nhà cung cấp
@@ -41,11 +57,13 @@ cookie đăng nhập hoạt động bình thường.
 | `JWT_SECRET` | Chuỗi ngẫu nhiên dài. Sinh bằng `node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"` |
 | `ADMIN_EMAILS` | Email được quyền admin, cách nhau bằng dấu phẩy |
 | `KIE_API_KEY` | API key Kie.ai của bạn |
-| `BANK_CODE` `BANK_ACCOUNT_NUMBER` `BANK_ACCOUNT_NAME` | Tài khoản nhận tiền, dùng để sinh mã QR VietQR |
-| `SEPAY_WEBHOOK_API_KEY` *hoặc* `CASSO_WEBHOOK_SECURE_TOKEN` | Để cộng điểm tự động khi ngân hàng báo có |
+| `STRIPE_SECRET_KEY` | Khoá bí mật Stripe (`sk_test_…` khi thử, `sk_live_…` khi bán thật) |
+| `STRIPE_WEBHOOK_SECRET` | Signing secret của endpoint webhook (`whsec_…`) |
+| `APP_URL` | Stripe dựng link quay-về từ đây — để sai là khách trả tiền xong bị ném về localhost |
 
-Chưa cấu hình webhook thì hệ thống vẫn chạy được — đơn nạp sẽ chờ admin duyệt tay trong bảng
-điều khiển. Server in cảnh báo cho từng mục còn thiếu khi khởi động.
+Chưa cấu hình `STRIPE_WEBHOOK_SECRET` thì hệ thống vẫn cộng điểm được (server tự hỏi thẳng
+Stripe mỗi lần khách mở trang đơn), nhưng chậm hơn và không có nhật ký sự kiện. Server in
+cảnh báo cho từng mục còn thiếu khi khởi động.
 
 ### Chạy thật (một tiến trình duy nhất)
 
@@ -288,7 +306,7 @@ tháng** cho khách VIP. Chọn gói, số tháng và cách tính thời hạn:
 
 Thao tác này chạy qua đúng đường kích hoạt của đơn đã thanh toán nên bảng `subscriptions` và sổ
 cái hạn mức giống hệt luồng mua thường; khác duy nhất là `order_id` để `NULL` và **không** cộng
-`total_topup_vnd` — tiền không vào thì doanh thu không được tính khống.
+`total_topup_usd_cents` — tiền không vào thì doanh thu không được tính khống.
 
 > Cân nhắc dùng nút **Điểm** thay cho nút này trong hầu hết trường hợp: hạn mức tháng **bị thu
 > hồi** khi hết hạn gói và **không cộng dồn** qua chu kỳ, còn điểm tặng thì khách giữ mãi.
@@ -320,28 +338,32 @@ hạn: tạo tài khoản xong, mua một gói điểm bất kỳ là tạo ản
 
 ### Đơn vị điểm
 
-> **1 điểm = 1đ giá vốn nhà cung cấp.**
+> **10.000 điểm = $1 giá vốn nhà cung cấp** (tức 1 điểm = $0,0001).
 
 Đây là điểm mấu chốt để mọi con số khớp nhau:
 
 | Khái niệm | Cách tính | Kết quả |
 |---|---|---|
-| Điểm tiêu hao mỗi ảnh | `api_cost_usd × USD_TO_VND` | GPT 1K = 840 · Pro 4K = 3.360 |
-| Gói điểm | khách nhận **một nửa** lượng điểm so với số tiền bỏ ra tính theo giá vốn | 499.000đ → **250.000 điểm** |
+| Điểm tiêu hao mỗi ảnh | `api_cost_usd × CREDITS_PER_USD` | GPT 1K = 300 · Pro 4K = 1.200 |
+| Gói điểm | khách nhận **một nửa** lượng điểm so với số tiền bỏ ra tính theo giá vốn | $49,99 → **250.000 điểm** |
 
-Bán gấp đôi giá vốn: phần chênh lệch là chi phí duy trì, nhân sự và lợi nhuận.
+Bán gấp đôi giá vốn: phần chênh lệch là chi phí duy trì, nhân sự và lợi nhuận. Nói cách
+khác, **$1 tiền bán mua được 5.000 điểm**.
 
 ### Bảng giá gói điểm
 
-Giá bán làm tròn xuống mốc x99.000đ nên đơn giá luôn xấp xỉ 2đ/điểm.
+Giá bán làm tròn xuống mốc x9,99 nên đơn giá luôn xấp xỉ $0,0002/điểm.
 
-| Gói | Điểm nhận | Đơn giá |
-|---|---|---|
-| 99.000đ | 50.000 | 1,98đ/điểm |
-| 199.000đ | 100.000 | 1,99đ/điểm |
-| **499.000đ** | **250.000** | 2,00đ/điểm |
-| 999.000đ | 500.000 | 2,00đ/điểm |
-| 1.999.000đ | 1.000.000 | 2,00đ/điểm |
+| Gói | Tên hiện cho khách | Điểm nhận | Giá vốn số điểm |
+|---|---|---|---|
+| $9,99 | Starter | 50.000 | $5,00 |
+| $19,99 | Basic | 100.000 | $10,00 |
+| **$49,99** | **Pro** | **250.000** | $25,00 |
+| $99,99 | Business | 500.000 | $50,00 |
+| $199,99 | Agency | 1.000.000 | $100,00 |
+
+> Tên gói và mô tả gói **hiển thị cho khách** nên phải viết bằng tiếng Anh khi sửa trong
+> Quản trị → Bảng giá. Giá nhập bằng **đô-la** (vd `49.99`), hệ thống tự quy sang cent.
 
 Sửa giá và số điểm ở tab **Bảng giá** trong trang Quản trị, hoặc trong `TOKEN_PACKAGES` của
 [seed.ts](server/src/seed.ts) nếu muốn đổi bộ mặc định.
@@ -352,29 +374,35 @@ Sửa giá và số điểm ở tab **Bảng giá** trong trang Quản trị, ho
 Đăng ký / Đăng nhập
         │
         ▼
-Mua gói điểm ──► Tạo đơn (mã NAPxxxxxx) ──► QR VietQR
-        │                      │
-        │    khách chuyển khoản│
-        │                      ▼
-        │        Ngân hàng ──► Webhook SePay/Casso
-        │                      │
-        │        khớp mã đơn ──┤
-        │                      ▼
-        │              Cộng điểm vào ví (không hết hạn)
-        │                      │
-        └──────────────────────┤
-                               ▼
-                    Tạo ảnh ──► Trừ điểm
-                               │
-                ┌──────────────┴──────────────┐
-             thành công                      lỗi
-                │                             │
-   Tải ảnh về server              Hoàn đúng số điểm đã trừ
+Chọn gói điểm ──► Ghi đơn vào DB (mã ORDxxxxxx) ──► Mở phiên Stripe Checkout
+        │                                                    │
+        │                              khách nhập thẻ ở Stripe│
+        │                                                    ▼
+        │                     Stripe ──► Webhook checkout.session.completed
+        │                        │                           │
+        │  (dự phòng) khách mở lại trang đơn ──► hỏi thẳng Stripe
+        │  (dự phòng) vòng đối soát định kỳ ────┤
+        │                                       ▼
+        │                        Cộng điểm vào ví (không hết hạn)
+        │                                       │
+        └───────────────────────────────────────┤
+                                                ▼
+                                     Tạo ảnh ──► Trừ điểm
+                                                │
+                                 ┌──────────────┴──────────────┐
+                              thành công                      lỗi
+                                 │                             │
+                    Tải ảnh về server              Hoàn đúng số điểm đã trừ
 ```
+
+Ba đường cùng đưa đơn về trạng thái đã trả là **cố ý dư thừa**: webhook là đường chính,
+hai đường còn lại cứu các trường hợp webhook trễ hoặc chưa được cấu hình. Cả ba đều đi qua
+`markOrderPaid`, vốn khoá dòng đơn bằng `FOR UPDATE` và chỉ cộng điểm cho đơn chưa giao,
+nên chạy chồng nhau cũng không cộng điểm hai lần.
 
 ### Di sản gói tháng
 
-Trước đây khách **bắt buộc** mua gói thuê bao tháng (1.500.000đ/tháng, kèm hạn mức 500.000
+Trước đây khách **bắt buộc** mua gói thuê bao tháng (kèm hạn mức 500.000
 điểm/tháng không cộng dồn) rồi mới được tạo ảnh, và điểm lẻ chỉ là phần mua thêm. Mô hình đó
 đã bỏ, nhưng hạ tầng của nó vẫn còn trong mã nguồn vì hai lý do:
 
@@ -523,7 +551,16 @@ khởi động (`DB_AUTO_MIGRATE=true`).
 | `affiliate_commissions` | Hoa hồng tiếp thị liên kết, mỗi đơn đúng một dòng |
 | `settings` | Cấu hình sửa nóng không cần restart |
 
-Số tiền lưu dạng số nguyên VNĐ (`BIGINT`), không có phần thập phân.
+Số tiền lưu dạng **USD cent**, số nguyên (`BIGINT`): `$49.99` = `4999`. Mọi cột tiền mang
+hậu tố `_usd_cents`. Không bao giờ lưu số thực — Stripe cũng nhận `unit_amount` bằng cent nên
+hai bên khớp tuyệt đối, và cộng trừ số nguyên thì không có sai số làm tròn tích luỹ trong sổ cái.
+
+> **Nâng cấp từ bản bán bằng VNĐ:** khi khởi động, server tự **đổi tên** các cột `*_vnd` thành
+> `*_usd_cents` (xem `migrateMoneyColumnsToUsdCents` trong [db.ts](server/src/db.ts)) nhưng
+> **KHÔNG quy đổi giá trị** — không có tỉ giá nào đúng cho mọi dòng, và đoán bừa một con số thì
+> mọi báo cáo doanh thu về sau đều sai âm thầm. Server in cảnh báo thật to; hãy đặt lại giá gói
+> trong Quản trị → Bảng giá, rồi tự quyết định cách xử lý lịch sử đơn cũ. Các gói điểm định giá
+> bằng VNĐ (`EXTRA_*`) được tự động **ngừng bán** để không ai lỡ mua gói 99.000 với giá $990.
 
 ### Múi giờ: mọi cột `DATETIME` lưu theo giờ UTC
 
@@ -552,19 +589,19 @@ giờ nên bỏ qua `timezone: 'Z'`, và `new Date(chuỗi)` lại đọc theo g
 
 ### Điểm tiêu hao mỗi ảnh
 
-`token_cost = api_cost_usd × USD_TO_VND` (1 điểm = 1đ giá vốn). Cột cuối tính trên gói
-499.000đ (250.000 điểm) nếu chỉ dùng một loại ảnh duy nhất.
+`token_cost = api_cost_usd × CREDITS_PER_USD` (10.000 điểm = $1 giá vốn). Cột cuối tính
+trên gói $49,99 (250.000 điểm) nếu chỉ dùng một loại ảnh duy nhất.
 
-| Model | Slug gửi API | Giá vốn (Kie.ai) | Điểm/ảnh | Số ảnh với gói 499.000đ |
+| Model | Slug gửi API | Giá vốn (Kie.ai) | Điểm/ảnh | Số ảnh với gói $49,99 |
 |---|---|---|---|---|
-| GPT Image 2 — 1K | `gpt-image-2-image-to-image` | $0.03 | 840 | ~297 |
-| **GPT Image 2 — 2K** | `gpt-image-2-image-to-image` | $0.05 | **1.400** | ~178 |
-| GPT Image 2 — 4K | `gpt-image-2-image-to-image` | $0.08 | 2.240 | ~111 |
-| Nano Banana 2 — 1K | `nano-banana-2` | $0.04 | 1.120 | ~223 |
-| Nano Banana 2 — 2K | `nano-banana-2` | $0.06 | 1.680 | ~148 |
-| Nano Banana 2 — 4K | `nano-banana-2` | $0.09 | 2.520 | ~99 |
-| Nano Banana Pro — 1K/2K | `nano-banana-pro` | $0.09 | 2.520 | ~99 |
-| Nano Banana Pro — 4K | `nano-banana-pro` | $0.12 | 3.360 | ~74 |
+| GPT Image 2 — 1K | `gpt-image-2-image-to-image` | $0.03 | 300 | ~833 |
+| **GPT Image 2 — 2K** | `gpt-image-2-image-to-image` | $0.05 | **500** | ~500 |
+| GPT Image 2 — 4K | `gpt-image-2-image-to-image` | $0.08 | 800 | ~312 |
+| Nano Banana 2 — 1K | `nano-banana-2` | $0.04 | 400 | ~625 |
+| Nano Banana 2 — 2K | `nano-banana-2` | $0.06 | 600 | ~416 |
+| Nano Banana 2 — 4K | `nano-banana-2` | $0.09 | 900 | ~277 |
+| Nano Banana Pro — 1K/2K | `nano-banana-pro` | $0.09 | 900 | ~277 |
+| Nano Banana Pro — 4K | `nano-banana-pro` | $0.12 | 1.200 | ~208 |
 | Nano Banana 2 Lite | `nano-banana-2-lite` | *chưa rõ* | — | **đang tắt bán** |
 
 > Bảng trên là **giá trị khởi tạo** trong [seed.ts](server/src/seed.ts), không phải giá đang
@@ -613,7 +650,7 @@ Bảng giá gói điểm nằm ở [mục 3](#3-mô-hình-kinh-doanh).
 Dữ liệu này chỉ được nạp **một lần** lúc khởi tạo (`INSERT IGNORE`). Sau đó sửa trong tab
 **Bảng giá & gói nạp** của trang Quản trị; server không ghi đè lại.
 
-> **Nâng cấp từ bản cũ:** phiên bản trước tính 1 điểm ≈ 100đ giá bán, bản này neo vào giá vốn
+> **Nâng cấp từ bản cũ:** bảng giá đã qua ba đời đơn vị (100đ giá bán → 1đ giá vốn → $0,0001
 > nên các con số lệch nhau khoảng 28 lần. Khi khởi động, server tự quy đổi `token_cost` của
 > những model còn giữ đúng giá trị mặc định cũ, và ngừng bán 5 gói điểm đời cũ (Trải nghiệm,
 > Creator, Creator Plus, Studio, Agency) vì chúng sai đơn vị. Dòng nào bạn đã tự chỉnh trong
@@ -629,26 +666,61 @@ khác đi sẽ được giữ nguyên.
 
 ---
 
-## 6. Cấu hình webhook nhận tiền tự động
+## 6. Cấu hình Stripe
 
-### SePay
-1. Vào SePay → Webhooks → thêm webhook mới.
-2. URL: `https://tenmien-cua-ban.com/api/webhooks/sepay`
-3. Kiểu xác thực: **API Key**, giá trị trùng với `SEPAY_WEBHOOK_API_KEY` trong `.env`.
+### Bước 1 — lấy khoá API
 
-### Casso (v2)
-1. Vào Casso → Webhook → thêm endpoint.
-2. URL: `https://tenmien-cua-ban.com/api/webhooks/casso`
-3. Secure Điểm trùng với `CASSO_WEBHOOK_SECURE_TOKEN` trong `.env`.
+Vào <https://dashboard.stripe.com/apikeys>, chép **Secret key** vào `STRIPE_SECRET_KEY`.
+Dùng `sk_test_…` cho tới khi chạy thông, rồi mới đổi sang `sk_live_…`.
 
-Webhook phải truy cập được từ Internet. Khi chạy thử ở máy cá nhân, dùng ngrok hoặc Cloudflare
-Tunnel để lấy một URL public.
+### Bước 2 — tạo endpoint webhook
 
-**Cách hệ thống khớp giao dịch:** nội dung chuyển khoản được bỏ hết ký tự đặc biệt rồi dò mã
-dạng `NAP` + 6 ký tự. Mọi ứng viên tìm được đều phải tồn tại thật trong bảng `orders` mới được
-dùng — chữ dính liền mã không thể làm cộng nhầm cho đơn khác. Giao dịch không khớp được vẫn
-lưu vào bảng `payment_events` với trạng thái `unmatched`; admin xem qua endpoint
-`GET /api/admin/payment-events` rồi duyệt tay đơn tương ứng ở tab **Đơn nạp**.
+Dashboard → **Developers → Webhooks → Add endpoint**:
+
+| Ô | Giá trị |
+|---|---|
+| Endpoint URL | `https://tenmien-cua-ban.com/api/webhooks/stripe` |
+| Events | `checkout.session.completed` và `checkout.session.async_payment_succeeded` |
+
+Chép **Signing secret** (`whsec_…`) vào `STRIPE_WEBHOOK_SECRET` rồi khởi động lại server.
+
+Chạy thử ở máy cá nhân thì dùng Stripe CLI, khỏi cần ngrok:
+
+```bash
+stripe listen --forward-to localhost:4000/api/webhooks/stripe
+```
+
+Lệnh này in ra một `whsec_…` tạm — dán vào `.env` và khởi động lại. Thẻ thử: `4242 4242 4242 4242`,
+ngày hết hạn bất kỳ trong tương lai, CVC bất kỳ.
+
+### Ba đường cùng xác nhận một đơn
+
+Cố ý dư thừa, để tiền về mà điểm không vào là chuyện không xảy ra:
+
+| Đường | Khi nào chạy | Cần gì |
+|---|---|---|
+| Webhook `checkout.session.completed` | Ngay khi Stripe thu xong | `STRIPE_WEBHOOK_SECRET` |
+| `syncOrderFromStripe` | Mỗi lần khách mở trang đơn — server hỏi thẳng Stripe | chỉ cần `STRIPE_SECRET_KEY` |
+| `fulfillPaidOrders` | Vòng đối soát định kỳ + lúc server khởi động | — |
+
+Cả ba đều đi qua `markOrderPaid`: dòng đơn bị khoá `FOR UPDATE`, và chỉ đơn chưa giao mới
+được cộng điểm. Chạy chồng nhau, Stripe bắn lại sự kiện, hay admin bấm duyệt tay thêm một lần
+đều **không** cộng điểm hai lần.
+
+Mọi sự kiện đã xác minh chữ ký đều được ghi vào bảng `payment_events` (khoá duy nhất trên
+`(provider, external_id)`). Tra một giao dịch thất lạc:
+
+```bash
+curl -s -b cookie.txt 'http://localhost:4000/api/admin/payment-events?limit=20'
+```
+
+### Vì sao webhook phải nằm trước `express.json()`
+
+Stripe ký trên **đúng chuỗi byte gốc** của request. Chỉ cần đi qua một bước parse rồi
+stringify lại là byte đổi (thứ tự khoá, khoảng trắng, escape unicode) và mọi chữ ký hợp lệ
+đều trượt. Vì vậy `webhookRouter` được gắn TRƯỚC `express.json()` trong
+[index.ts](server/src/index.ts) và tự dùng `express.raw` cho riêng đường dẫn của mình.
+Đổi thứ tự hai dòng đó là mọi thanh toán ngừng được ghi nhận.
 
 ### Dùng workflow riêng thay cho webhook có sẵn
 
@@ -656,7 +728,7 @@ Nếu bạn đã có hệ thống xử lý thanh toán riêng (n8n, Make, script
 nào cả. Chỉ cần đổi trạng thái đơn trong database:
 
 ```sql
-UPDATE orders SET status = 'paid' WHERE code = 'NAPXXXXXX';
+UPDATE orders SET status = 'paid' WHERE code = 'ORDXXXXXX';
 ```
 
 Server tự phát hiện trong vòng `ORDER_SYNC_INTERVAL_SECONDS` (mặc định 20 giây) rồi làm nốt

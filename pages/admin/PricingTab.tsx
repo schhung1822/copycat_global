@@ -1,8 +1,17 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, Card, TableWrap } from '../../components/ui';
 import { api, ApiError } from '../../lib/api';
-import { formatNumber, formatVnd } from '../../lib/format';
+import { formatNumberVi, formatUsd } from '../../lib/format';
 import type { AdminModelPricing, AdminPackage, AdminPlan } from '../../types';
+
+/**
+ * Số tiền lưu bằng CENT nhưng admin gõ bằng ĐÔ-LA.
+ *
+ * Bắt người vận hành gõ "4999" cho gói $49,99 là công thức sai giá: gõ thiếu một
+ * số 0 thì gói $49,99 thành $4,99 mà nhìn vào ô nhập không thấy gì bất thường.
+ */
+const centsToDollars = (cents: number): string => (cents / 100).toFixed(2);
+const dollarsToCents = (value: string): number => Math.round(Number(value.replace(/[^0-9.-]/g, '')) * 100);
 
 /** Ô nhập chỉnh sửa tại chỗ: chỉ gọi API khi giá trị thực sự đổi và rời khỏi ô. */
 const EditableCell: React.FC<{
@@ -44,17 +53,17 @@ export const PricingTab: React.FC = () => {
   const [models, setModels] = useState<AdminModelPricing[]>([]);
   const [packages, setPackages] = useState<AdminPackage[]>([]);
   const [plans, setPlans] = useState<AdminPlan[]>([]);
-  const [usdToVnd, setUsdToVnd] = useState(28000);
+  const [creditsPerUsd, setUsdToVnd] = useState(28000);
   const [message, setMessage] = useState<{ tone: 'success' | 'error'; text: string } | null>(null);
 
   const load = useCallback(async () => {
     const [modelData, packageData, planData] = await Promise.all([
-      api.get<{ models: AdminModelPricing[]; usdToVnd: number }>('/admin/pricing'),
+      api.get<{ models: AdminModelPricing[]; creditsPerUsd: number }>('/admin/pricing'),
       api.get<{ packages: AdminPackage[] }>('/admin/packages'),
       api.get<{ plans: AdminPlan[] }>('/admin/plans'),
     ]);
     setModels(modelData.models);
-    setUsdToVnd(modelData.usdToVnd);
+    setUsdToVnd(modelData.creditsPerUsd);
     setPackages(packageData.packages);
     setPlans(planData.plans);
   }, []);
@@ -110,7 +119,7 @@ export const PricingTab: React.FC = () => {
             Hệ thống nay <strong>chỉ bán điểm</strong>: khách mua điểm là dùng được ngay, không phải mua gói. Bảng này
             giữ lại để bạn <strong>cấp gói tay</strong> cho khách VIP ở tab Khách hàng → nút "Gói", và để các gói đã bán
             trước đây chạy hết hạn. Cột <strong>Bán</strong> không còn tác dụng gì với khách — không có màn hình nào của
-            khách hiện các gói này nữa. <strong>Hạn mức</strong> được cấp lại mỗi tháng và không cộng dồn; 1 điểm = 1đ
+            khách hiện các gói này nữa. <strong>Hạn mức</strong> được cấp lại mỗi tháng và không cộng dồn; 10.000 điểm = $1
             giá vốn.
           </p>
         </div>
@@ -121,7 +130,7 @@ export const PricingTab: React.FC = () => {
               <th className="text-left font-bold py-2">Mã</th>
               <th className="text-left font-bold py-2">Tên gói</th>
               <th className="text-right font-bold py-2">Chu kỳ</th>
-              <th className="text-right font-bold py-2">Giá cả kỳ</th>
+              <th className="text-right font-bold py-2">Giá cả kỳ ($)</th>
               <th className="text-right font-bold py-2">Quy ra/tháng</th>
               <th className="text-right font-bold py-2">Hạn mức/tháng</th>
               <th className="text-center font-bold py-2">Nổi bật</th>
@@ -149,12 +158,12 @@ export const PricingTab: React.FC = () => {
                 </td>
                 <td className="py-2 text-right">
                   <EditableCell
-                    value={plan.priceVnd}
+                    value={centsToDollars(plan.priceUsdCents)}
                     width="w-28"
-                    onSave={(value) => updatePlan(plan.id, { priceVnd: Number(value) })}
+                    onSave={(value) => updatePlan(plan.id, { priceUsdCents: dollarsToCents(value) })}
                   />
                 </td>
-                <td className="py-2 text-right text-gray-400 text-xs">{formatVnd(plan.pricePerMonthVnd)}</td>
+                <td className="py-2 text-right text-gray-400 text-xs">{formatUsd(plan.pricePerMonthUsdCents)}</td>
                 <td className="py-2 text-right">
                   <EditableCell
                     value={plan.monthlyTokenAllowance}
@@ -205,7 +214,6 @@ export const PricingTab: React.FC = () => {
               <th className="text-left font-bold py-2">Slug gửi API</th>
               <th className="text-left font-bold py-2">Độ phân giải</th>
               <th className="text-right font-bold py-2">Giá vốn (USD)</th>
-              <th className="text-right font-bold py-2">≈ VNĐ</th>
               <th className="text-right font-bold py-2">Điểm thu</th>
               <th className="text-right font-bold py-2">Giá bán</th>
               <th className="text-right font-bold py-2">Biên</th>
@@ -233,7 +241,6 @@ export const PricingTab: React.FC = () => {
                     onSave={(value) => updateModel(model.id, { apiCostUsd: Number(value) })}
                   />
                 </td>
-                <td className="py-2 text-right text-gray-500 text-xs">{formatVnd(model.apiCostVnd)}</td>
                 <td className="py-2 text-right">
                   <EditableCell
                     value={model.tokenCost}
@@ -241,7 +248,7 @@ export const PricingTab: React.FC = () => {
                     onSave={(value) => updateModel(model.id, { tokenCost: Number(value) })}
                   />
                 </td>
-                <td className="py-2 text-right text-gray-300 text-xs">{formatVnd(model.sellPriceVnd)}</td>
+                <td className="py-2 text-right text-gray-300 text-xs">{formatUsd(model.sellPriceUsdCents)}</td>
                 <td
                   className={`py-2 text-right text-xs font-semibold ${
                     model.marginPercent >= 50 ? 'text-green-400' : model.marginPercent >= 30 ? 'text-amber-400' : 'text-red-400'
@@ -289,8 +296,9 @@ export const PricingTab: React.FC = () => {
         </TableWrap>
 
         <p className="text-[11px] text-gray-600 mt-3">
-          Tỉ giá quy đổi hiện tại: 1 USD = {formatVnd(usdToVnd)} (sửa bằng <code>USD_TO_VND</code> trong <code>.env</code>).
-          Giá bán = số điểm × 100đ.
+          Quy ước điểm hiện tại: <strong>{formatNumberVi(creditsPerUsd)} điểm = $1 giá vốn</strong> nhà cung cấp (sửa
+          bằng <code>CREDITS_PER_USD</code> trong <code>.env</code> — đọc chú thích trong <code>env.ts</code> trước khi
+          đụng tới). Cột <strong>Giá bán</strong> là doanh thu của một ảnh theo đơn giá bán gấp đôi giá vốn.
         </p>
       </Card>
 
@@ -298,9 +306,12 @@ export const PricingTab: React.FC = () => {
         <div className="mb-4">
           <h2 className="font-bold text-gray-100">Gói điểm</h2>
           <p className="text-xs text-gray-500 mt-1">
-            Sản phẩm <strong>duy nhất đang bán</strong>. Quy tắc định giá: bán <strong>gấp đôi giá vốn</strong>, tức số
-            điểm nhận được bằng nửa số tiền nạp. Điểm đã mua không hết hạn. Cột <strong>Mô tả</strong> là dòng chữ nhỏ
-            hiện dưới mỗi thẻ gói ở trang giới thiệu và trang Mua điểm — để trống thì thẻ không hiện dòng đó.
+            Sản phẩm <strong>duy nhất đang bán</strong>. Quy tắc định giá: bán <strong>gấp đôi giá vốn</strong>, tức
+            $1 mua được 5.000 điểm. Giá nhập bằng <strong>đô-la</strong> (vd 49.99), hệ thống tự quy sang cent. Điểm đã
+            mua không hết hạn.
+            <br />
+            <strong>Tên gói</strong> và <strong>Mô tả</strong> HIỂN THỊ CHO KHÁCH ở trang giới thiệu và trang Mua điểm
+            nên phải viết bằng <strong>tiếng Anh</strong> — để trống mô tả thì thẻ không hiện dòng đó.
           </p>
         </div>
 
@@ -310,11 +321,11 @@ export const PricingTab: React.FC = () => {
               <th className="text-left font-bold py-2">Mã</th>
               <th className="text-left font-bold py-2">Tên gói</th>
               <th className="text-left font-bold py-2">Mô tả</th>
-              <th className="text-right font-bold py-2">Giá nạp</th>
+              <th className="text-right font-bold py-2">Giá bán ($)</th>
               <th className="text-right font-bold py-2">Điểm cơ bản</th>
               <th className="text-right font-bold py-2">Điểm thưởng</th>
               <th className="text-right font-bold py-2">Tổng nhận</th>
-              <th className="text-right font-bold py-2">Giá/điểm</th>
+              <th className="text-right font-bold py-2">Giá/điểm (¢)</th>
               <th className="text-center font-bold py-2">Nổi bật</th>
               <th className="text-center font-bold py-2">Bán</th>
             </tr>
@@ -341,9 +352,9 @@ export const PricingTab: React.FC = () => {
                 </td>
                 <td className="py-2 text-right">
                   <EditableCell
-                    value={pkg.priceVnd}
+                    value={centsToDollars(pkg.priceUsdCents)}
                     width="w-24"
-                    onSave={(value) => updatePackage(pkg.id, { priceVnd: Number(value) })}
+                    onSave={(value) => updatePackage(pkg.id, { priceUsdCents: dollarsToCents(value) })}
                   />
                 </td>
                 <td className="py-2 text-right">
@@ -361,9 +372,11 @@ export const PricingTab: React.FC = () => {
                   />
                 </td>
                 <td className="py-2 text-right text-brand-500 font-semibold text-xs">
-                  {formatNumber(pkg.totalTokens)}
+                  {formatNumberVi(pkg.totalTokens)}
                 </td>
-                <td className="py-2 text-right text-gray-500 text-xs">{pkg.pricePerToken.toLocaleString('vi-VN')}đ</td>
+                <td className="py-2 text-right text-gray-500 text-xs">
+                  {pkg.pricePerTokenCents.toFixed(4)}¢
+                </td>
                 <td className="py-2 text-center">
                   <input
                     type="checkbox"

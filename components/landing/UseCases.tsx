@@ -4,24 +4,24 @@ import { SectionHeading } from './SectionHeading';
 
 const CASES = [
   {
-    who: 'Chủ shop online',
-    pain: 'Mỗi lần nhập hàng mới lại phải thuê chụp, chờ hai ba ngày mới có ảnh đăng.',
-    gain: 'Chụp sản phẩm bằng điện thoại, mượn bố cục của shop nước ngoài, có ảnh đăng trong buổi sáng.',
+    who: 'Online store owners',
+    pain: 'Every new shipment means booking a photographer and waiting two or three days for usable shots.',
+    gain: 'Shoot the product on your phone, borrow a layout from a brand you admire, and publish the same morning.',
   },
   {
-    who: 'Người chạy quảng cáo',
-    pain: 'Cần chục biến thể hình ảnh để test nhưng designer chỉ kịp làm hai ba cái.',
-    gain: 'Một ảnh mẫu chạy ra bốn phương án một lượt, đủ nguyên liệu để test A/B cả tuần.',
+    who: 'Performance marketers',
+    pain: 'You need a dozen creative variants to test, but your designer can only turn around two or three.',
+    gain: 'One reference produces four variants per run — a week of A/B material in a single sitting.',
   },
   {
-    who: 'Agency & freelancer',
-    pain: 'Khách đưa link tham khảo rồi bảo "làm giống vậy nhưng cho sản phẩm của tôi".',
-    gain: 'Dựng bản demo ngay trong buổi họp, chốt hướng với khách trước khi bỏ công làm bản chính.',
+    who: 'Agencies & freelancers',
+    pain: 'The client sends a reference link and says "make it like this, but with my product".',
+    gain: 'Build the demo live in the meeting and lock the direction before you invest in the real thing.',
   },
   {
-    who: 'Thương hiệu nhỏ',
-    pain: 'Ảnh mỗi kênh mỗi kiểu, nhìn vào không ra một bộ nhận diện nào.',
-    gain: 'Dùng chung một ảnh mẫu cho cả dòng sản phẩm, ảnh ra đồng bộ từ website tới sàn.',
+    who: 'Small brands',
+    pain: 'Every channel looks different — nothing reads as one coherent identity.',
+    gain: 'Use one reference across the whole product line, so everything matches from your site to the marketplace.',
   },
 ];
 
@@ -35,9 +35,9 @@ export const UseCases: React.FC = () => (
   <section className="border-y border-dark-800 bg-dark-900/40 py-14 sm:py-20 lg:py-28">
     <div className="mx-auto max-w-[1280px] px-4 sm:px-6">
       <SectionHeading
-        eyebrow="Dành cho ai"
-        title="Nếu bạn từng ước có ảnh đẹp mà không phải chờ designer"
-        description="Hệ thống được dựng cho người bán hàng ở Việt Nam: nhanh, rẻ hơn thuê chụp, và không đòi hỏi kỹ năng đồ hoạ."
+        eyebrow="Who it is for"
+        title="If you have ever wished for great imagery without waiting on a designer"
+        description="Built for people who sell online: fast, far cheaper than a photo shoot, and it asks for zero design skill."
       />
 
       <div className="mt-10 grid sm:mt-14 gap-4 sm:grid-cols-2">

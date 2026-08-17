@@ -85,10 +85,10 @@ const MODEL_SPECS: Record<string, KieModelSpec> = {
     outputFormat: null,
     restrict: (resolution, aspectRatio) => {
       if (resolution !== '1K' && (aspectRatio === '5:4' || aspectRatio === '4:5')) {
-        return 'GPT Image 2 chỉ tạo được tỉ lệ 5:4 và 4:5 ở chất lượng 1K. Hãy chọn 1K hoặc đổi tỉ lệ khác.';
+        return 'GPT Image 2 only supports the 5:4 and 4:5 ratios at 1K. Pick 1K, or choose another ratio.';
       }
       if (resolution === '4K' && aspectRatio === '1:1') {
-        return 'GPT Image 2 không xuất được ảnh 4K ở tỉ lệ 1:1. Hãy chọn 2K hoặc đổi tỉ lệ khác.';
+        return 'GPT Image 2 cannot output 4K at a 1:1 ratio. Pick 2K, or choose another ratio.';
       }
       return null;
     },
@@ -139,9 +139,9 @@ const authHeaders = () => ({
  * Toàn bộ chi tiết để gỡ lỗi được in ra log của server cho quản trị viên.
  */
 const USER_MESSAGE = {
-  system: 'Hệ thống tạm thời chưa tạo được ảnh. Vui lòng thử lại sau ít phút.',
-  config: 'Hệ thống chưa sẵn sàng tạo ảnh. Vui lòng liên hệ quản trị viên.',
-  timeout: 'Ảnh xử lý quá lâu nên đã dừng lại. Vui lòng thử lại.',
+  system: 'We could not generate that image right now. Please try again in a few minutes.',
+  config: 'Image generation is not available yet. Please contact support.',
+  timeout: 'This image took too long and was stopped. Please try again.',
 } as const;
 
 /** Ghi chi tiết kỹ thuật ra log rồi ném lỗi với câu ngắn gọn cho khách. */
@@ -455,16 +455,16 @@ export const kieProvider: ImageProvider = {
     const spec = specFor(providerModel);
 
     if (spec.imagesRequired && imageCount === 0) {
-      return 'Model này bắt buộc phải có ảnh đầu vào.';
+      return 'This model requires at least one input image.';
     }
     if (imageCount > spec.maxImages) {
-      return `Model này nhận tối đa ${spec.maxImages} ảnh đầu vào, bạn đang gửi ${imageCount} ảnh.`;
+      return `This model accepts at most ${spec.maxImages} input images, you sent ${imageCount}.`;
     }
     if (!spec.aspectRatios.includes(aspectRatio)) {
-      return `Model này không hỗ trợ tỉ lệ ${aspectRatio}. Các tỉ lệ hợp lệ: ${spec.aspectRatios.join(', ')}.`;
+      return `This model does not support the ${aspectRatio} ratio. Supported: ${spec.aspectRatios.join(', ')}.`;
     }
     if (spec.resolutions && !spec.resolutions.includes(resolution)) {
-      return `Model này không hỗ trợ chất lượng ${resolution}. Chỉ nhận: ${spec.resolutions.join(', ')}.`;
+      return `This model does not support ${resolution}. Supported: ${spec.resolutions.join(', ')}.`;
     }
 
     // Ràng buộc riêng phải xét trên tỉ lệ THẬT SỰ được gửi đi, không phải trên
@@ -533,7 +533,7 @@ export const kieProvider: ImageProvider = {
 
       if (status === 'fail' || status === 'failed' || status === 'error') {
         const reason = pollData.data?.failReason ?? pollData.data?.error ?? 'không rõ nguyên nhân';
-        throw new AppError(502, `Tạo ảnh thất bại: ${reason}`, 'provider_failed');
+        throw new AppError(502, `Image generation failed: ${reason}`, 'provider_failed');
       }
     }
 

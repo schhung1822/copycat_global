@@ -17,21 +17,21 @@ const FAMILY_COPY: { family: string; name: string; tagline: string; best: string
   {
     family: 'gpt-image-2',
     name: 'GPT Image 2',
-    tagline: 'Xử lý chữ và bố cục quảng cáo tốt, lại là mức giá dễ chịu nhất.',
-    best: 'Banner nhiều chữ, thử bố cục trước khi chạy bản đẹp',
+    tagline: 'Great with text and ad layouts, and the easiest on your credit balance.',
+    best: 'Copy-heavy banners, and testing layouts before a final run',
   },
   {
     family: 'nano-banana-2',
     name: 'Nano Banana 2',
-    tagline: 'Cân bằng giữa độ đẹp và tốc độ, an toàn cho phần lớn nhu cầu hằng ngày.',
-    best: 'Ảnh đăng mạng xã hội mỗi ngày',
+    tagline: 'Balances quality and speed — the safe pick for everyday work.',
+    best: 'Daily social posts',
     highlight: true,
   },
   {
     family: 'nano-banana-pro',
     name: 'Nano Banana Pro',
-    tagline: 'Bám sát ảnh mẫu nhất, giữ đúng chi tiết và màu sản phẩm.',
-    best: 'Ảnh đăng chính thức, ảnh sản phẩm lên sàn',
+    tagline: 'Follows the reference most closely and preserves product detail and colour.',
+    best: 'Official launches and marketplace listings',
   },
 ];
 
@@ -44,15 +44,15 @@ const FAMILY_COPY: { family: string; name: string; tagline: string; best: string
  * hơn là khu bảng giá trống trơn.
  */
 const FALLBACK: ModelOption[] = [
-  { code: 'nano-banana-pro-1k', label: '', family: 'nano-banana-pro', resolution: '1K', tokenCost: 2520, isEstimateReference: false, notes: null },
-  { code: 'nano-banana-pro-2k', label: '', family: 'nano-banana-pro', resolution: '2K', tokenCost: 2520, isEstimateReference: false, notes: null },
-  { code: 'nano-banana-pro-4k', label: '', family: 'nano-banana-pro', resolution: '4K', tokenCost: 3360, isEstimateReference: false, notes: null },
-  { code: 'nano-banana-2-1k', label: '', family: 'nano-banana-2', resolution: '1K', tokenCost: 1120, isEstimateReference: false, notes: null },
-  { code: 'nano-banana-2-2k', label: '', family: 'nano-banana-2', resolution: '2K', tokenCost: 1680, isEstimateReference: false, notes: null },
-  { code: 'nano-banana-2-4k', label: '', family: 'nano-banana-2', resolution: '4K', tokenCost: 2520, isEstimateReference: false, notes: null },
-  { code: 'gpt-image-2-1k', label: '', family: 'gpt-image-2', resolution: '1K', tokenCost: 840, isEstimateReference: false, notes: null },
-  { code: 'gpt-image-2-2k', label: '', family: 'gpt-image-2', resolution: '2K', tokenCost: 1400, isEstimateReference: true, notes: null },
-  { code: 'gpt-image-2-4k', label: '', family: 'gpt-image-2', resolution: '4K', tokenCost: 2240, isEstimateReference: false, notes: null },
+  { code: 'nano-banana-pro-1k', label: '', family: 'nano-banana-pro', resolution: '1K', tokenCost: 900, isEstimateReference: false, notes: null },
+  { code: 'nano-banana-pro-2k', label: '', family: 'nano-banana-pro', resolution: '2K', tokenCost: 900, isEstimateReference: false, notes: null },
+  { code: 'nano-banana-pro-4k', label: '', family: 'nano-banana-pro', resolution: '4K', tokenCost: 1200, isEstimateReference: false, notes: null },
+  { code: 'nano-banana-2-1k', label: '', family: 'nano-banana-2', resolution: '1K', tokenCost: 400, isEstimateReference: false, notes: null },
+  { code: 'nano-banana-2-2k', label: '', family: 'nano-banana-2', resolution: '2K', tokenCost: 600, isEstimateReference: false, notes: null },
+  { code: 'nano-banana-2-4k', label: '', family: 'nano-banana-2', resolution: '4K', tokenCost: 900, isEstimateReference: false, notes: null },
+  { code: 'gpt-image-2-1k', label: '', family: 'gpt-image-2', resolution: '1K', tokenCost: 300, isEstimateReference: false, notes: null },
+  { code: 'gpt-image-2-2k', label: '', family: 'gpt-image-2', resolution: '2K', tokenCost: 500, isEstimateReference: true, notes: null },
+  { code: 'gpt-image-2-4k', label: '', family: 'gpt-image-2', resolution: '4K', tokenCost: 800, isEstimateReference: false, notes: null },
 ];
 
 const RESOLUTION_ORDER = ['1K', '2K', '4K'];
@@ -77,15 +77,15 @@ export const Models: React.FC<{ models?: ModelOption[]; packages?: TokenPackage[
   }).filter((card) => card.tiers.length > 0);
 
   return (
-    <section id="model" className="scroll-mt-20 py-14 sm:py-20 lg:py-28">
+    <section id="models" className="scroll-mt-20 py-14 sm:py-20 lg:py-28">
       <div className="mx-auto max-w-[1280px] px-4 sm:px-6">
         <SectionHeading
-          eyebrow="Model AI"
-          title="Chọn model theo việc, không phải theo lời quảng cáo"
+          eyebrow="AI models"
+          title="Pick a model for the job, not for the marketing"
           description={
             basis
-              ? `Điểm trừ theo đúng model và độ phân giải bạn chọn, hiện rõ trước khi bấm tạo. Số ảnh bên phải là ước tính nếu dùng trọn ${formatNumber(basis.totalTokens)} điểm của ${basis.name}.`
-              : 'Điểm trừ theo đúng model và độ phân giải bạn chọn, hiện rõ trước khi bấm tạo.'
+              ? `Credits are charged per model and resolution, and shown before you press generate. The image counts on the right assume the full ${formatNumber(basis.totalTokens)} credits from the ${basis.name} pack.`
+              : 'Credits are charged per model and resolution, and shown before you press generate.'
           }
         />
 
@@ -102,7 +102,7 @@ export const Models: React.FC<{ models?: ModelOption[]; packages?: TokenPackage[
             >
               {card.highlight && (
                 <span className="absolute -top-2.5 left-6 rounded-full bg-brand-500 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">
-                  Phổ biến nhất
+                  Most popular
                 </span>
               )}
 
@@ -117,11 +117,11 @@ export const Models: React.FC<{ models?: ModelOption[]; packages?: TokenPackage[
                   >
                     <span className="font-semibold text-gray-200">{tier.resolution}</span>
                     <span className="text-xs text-gray-500">
-                      <span className="font-semibold text-gray-300">{formatNumber(tier.tokenCost)}</span> điểm
+                      <span className="font-semibold text-gray-300">{formatNumber(tier.tokenCost)}</span> credits
                       {basis && (
                         <>
                           <span className="mx-1.5 text-gray-600">·</span>~
-                          {formatNumber(roundedImageCount(basis.totalTokens, tier.tokenCost))} ảnh
+                          {formatNumber(roundedImageCount(basis.totalTokens, tier.tokenCost))} images
                         </>
                       )}
                     </span>
@@ -130,7 +130,7 @@ export const Models: React.FC<{ models?: ModelOption[]; packages?: TokenPackage[
               </div>
 
               <p className="mt-5 border-t border-dark-800 pt-4 text-xs leading-relaxed text-gray-500">
-                <span className="font-bold text-gray-400">Hợp nhất với: </span>
+                <span className="font-bold text-gray-400">Best for: </span>
                 {card.best}
               </p>
             </Reveal>
@@ -139,8 +139,8 @@ export const Models: React.FC<{ models?: ModelOption[]; packages?: TokenPackage[
 
         {/* <Reveal delay={140}>
           <p className="mx-auto mt-8 max-w-2xl text-center text-xs leading-relaxed text-gray-500">
-            Quy ước điểm rất đơn giản: <span className="font-semibold text-gray-400">1 điểm = 1đ giá vốn</span> trả cho
-            nhà cung cấp mô hình. Bạn luôn thấy đúng chi phí thật của mỗi tấm ảnh.
+            The credit rule is simple: <span className="font-semibold text-gray-400">10,000 credits = $1 of provider
+            cost</span>. You always see the true cost of each image.
           </p>
         </Reveal> */}
       </div>

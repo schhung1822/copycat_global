@@ -88,10 +88,10 @@ affiliateRouter.get(
 
     const rows = await query<RowDataPacket & Record<string, any>>(
       `SELECT u.id, u.email, u.created_at, u.referred_at,
-              COALESCE((SELECT SUM(c.revenue_vnd) FROM affiliate_commissions c
+              COALESCE((SELECT SUM(c.revenue_usd_cents) FROM affiliate_commissions c
                          WHERE c.referred_user_id = u.id AND c.affiliate_user_id = ?
                            AND c.status <> 'cancelled'), 0) AS revenue,
-              COALESCE((SELECT SUM(c.commission_vnd) FROM affiliate_commissions c
+              COALESCE((SELECT SUM(c.commission_usd_cents) FROM affiliate_commissions c
                          WHERE c.referred_user_id = u.id AND c.affiliate_user_id = ?
                            AND c.status <> 'cancelled'), 0) AS commission
          FROM users u
@@ -109,8 +109,8 @@ affiliateRouter.get(
         id: row.id,
         customer: maskEmail(row.email),
         joinedAt: row.referred_at ?? row.created_at,
-        revenueVnd: Number(row.revenue) || 0,
-        commissionVnd: Number(row.commission) || 0,
+        revenueUsdCents: Number(row.revenue) || 0,
+        commissionUsdCents: Number(row.commission) || 0,
       })),
       page,
       limit,

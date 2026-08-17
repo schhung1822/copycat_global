@@ -1,15 +1,15 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { APP_HOME } from '../../lib/routes';
+import { APP_HOME, SIGNUP } from '../../lib/routes';
 import { HeroShowcase } from './HeroShowcase';
 import { Reveal } from './Reveal';
 
 const BENEFITS = [
-  'Tăng 90% hiệu quả, Tạo 100 ảnh chỉ trong 3 phút',
-  'Sáng tạo nhiều Style, Concept bán hàng',
+  '90% faster: 100 product images in about 3 minutes',
+  'Explore any style or selling concept you like',
 ];
 
-const PROMISES = ['Giữ nguyên bố cục ảnh mẫu', 'Chuyển khoản QR, kích hoạt tự động', 'Ảnh lỗi hoàn điểm ngay'];
+const PROMISES = ['Keeps the reference layout', 'Card payment, credits land instantly', 'Failed images refunded'];
 
 const CheckIcon: React.FC<{ className?: string }> = ({ className = '' }) => (
   <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5} aria-hidden>
@@ -39,9 +39,9 @@ export const Hero: React.FC<{ isLoggedIn: boolean }> = ({ isLoggedIn }) => (
 
         <Reveal delay={90}>
           <h1 className="mx-auto mt-5 max-w-2xl text-balance text-[2.15rem] font-bold leading-[1.05] tracking-tight text-gray-100 sm:mt-6 sm:text-5xl lg:mx-0 lg:text-[3.25rem]">
-            Tạo ảnh bằng AI - Không cần mẫu
+            AI product photos — no model,
             <span className="block">
-              Không cần studio - <span className="lp-gradient-text">CHÂN THỰC 100%</span>
+              no studio, <span className="lp-gradient-text">100% REALISTIC</span>
             </span>
           </h1>
         </Reveal>
@@ -69,10 +69,10 @@ export const Hero: React.FC<{ isLoggedIn: boolean }> = ({ isLoggedIn }) => (
         <Reveal delay={230}>
           <div className="mt-7 flex flex-col items-stretch justify-center gap-2.5 sm:mt-8 sm:flex-row sm:items-center sm:gap-3 lg:justify-start">
             <Link
-              to={isLoggedIn ? APP_HOME : '/dang-ky'}
+              to={isLoggedIn ? APP_HOME : SIGNUP}
               className="group inline-flex items-center justify-center gap-2 rounded-full bg-brand-500 px-7 py-3.5 text-sm font-bold text-white shadow-xl shadow-brand-500/30 transition-all hover:-translate-y-0.5 hover:bg-brand-600 hover:shadow-brand-500/45"
             >
-              {isLoggedIn ? 'Vào tạo ảnh' : 'Tạo ảnh đầu tiên'}
+              {isLoggedIn ? 'Open the studio' : 'Create your first image'}
               <svg
                 className="h-4 w-4 transition-transform group-hover:translate-x-1"
                 fill="none"
@@ -86,13 +86,13 @@ export const Hero: React.FC<{ isLoggedIn: boolean }> = ({ isLoggedIn }) => (
             </Link>
 
             <a
-              href="#quy-trinh"
+              href="#how-it-works"
               className="inline-flex items-center justify-center gap-2 rounded-full border border-dark-700 bg-dark-900/60 px-7 py-3.5 text-sm font-bold text-gray-200 shadow-sm shadow-black/5 backdrop-blur transition-all hover:-translate-y-0.5 hover:border-dark-600 hover:bg-dark-850"
             >
               <svg className="h-4 w-4 text-brand-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2} aria-hidden>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M8 5v14l11-7-11-7z" />
               </svg>
-              Xem cách hoạt động
+              See how it works
             </a>
           </div>
         </Reveal>

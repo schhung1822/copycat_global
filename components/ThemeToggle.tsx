@@ -10,8 +10,8 @@ export const ThemeToggle: React.FC<{ className?: string }> = ({ className = '' }
     <button
       onClick={toggleTheme}
       className={`w-8 h-8 rounded-full bg-dark-850 border border-dark-700 text-gray-400 hover:text-gray-100 hover:border-dark-600 flex items-center justify-center transition-colors ${className}`}
-      title={isDark ? 'Chuyển sang chế độ sáng' : 'Chuyển sang chế độ tối'}
-      aria-label={isDark ? 'Chuyển sang chế độ sáng' : 'Chuyển sang chế độ tối'}
+      title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+      aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
     >
       {isDark ? (
         // Mặt trời — bấm để sang chế độ sáng

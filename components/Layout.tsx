@@ -2,14 +2,14 @@ import React from 'react';
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { formatNumber } from '../lib/format';
-import { APP_HOME } from '../lib/routes';
+import { ACCOUNT, ADMIN, AFFILIATE, APP_HOME, CREDITS, HISTORY, LOGIN, WALLET } from '../lib/routes';
 import { ThemeToggle } from './ThemeToggle';
 
 const navItems = [
-  { to: APP_HOME, label: 'Tạo ảnh' },
-  { to: '/lich-su', label: 'Lịch sử' },
-  { to: '/vi-diem', label: 'Ví điểm' },
-  { to: '/nap-tien', label: 'Mua điểm' },
+  { to: APP_HOME, label: 'Studio' },
+  { to: HISTORY, label: 'History' },
+  { to: WALLET, label: 'Credits' },
+  { to: CREDITS, label: 'Buy credits' },
 ];
 
 // Bấm logo trong ứng dụng về bàn làm việc, không về trang bán hàng: khách đã
@@ -31,7 +31,7 @@ export const Layout: React.FC = () => {
 
   const handleLogout = async () => {
     await logout();
-    navigate('/dang-nhap');
+    navigate(LOGIN);
   };
 
   const linkClass = ({ isActive }: { isActive: boolean }) =>
@@ -54,12 +54,13 @@ export const Layout: React.FC = () => {
           ))}
           {/* Chỉ hiện với người đã được cấp vai trò cộng tác viên — xem AffiliatePage. */}
           {isAffiliate && (
-            <NavLink to="/affiliate" className={linkClass}>
+            <NavLink to={AFFILIATE} className={linkClass}>
               Affiliate
             </NavLink>
           )}
+          {/* Nhãn tiếng Việt là có chủ đích: khu vực quản trị chỉ dành cho nội bộ. */}
           {isAdmin && (
-            <NavLink to="/quan-tri" className={linkClass}>
+            <NavLink to={ADMIN} className={linkClass}>
               <span className="text-brand-500">●</span> Quản trị
             </NavLink>
           )}
@@ -72,29 +73,29 @@ export const Layout: React.FC = () => {
           */}
           {user && user.tokenBalance > 0 ? (
             <Link
-              to="/nap-tien"
+              to={CREDITS}
               className="flex items-center gap-2 bg-dark-850 hover:bg-dark-800 border border-dark-700 rounded-full pl-3 pr-2 py-1.5 transition-colors group"
               title={
                 // Chỉ tách nguồn khi khách còn hạn mức của gói tháng cũ. Khách
                 // mua điểm thuần không biết "hạn mức tháng" là gì.
                 user.monthlyTokens > 0
-                  ? `Hạn mức tháng: ${formatNumber(user.monthlyTokens)} điểm\n` +
-                    `Đã mua thêm: ${formatNumber(user.purchasedTokens)} điểm`
-                  : `${formatNumber(user.tokenBalance)} điểm — bấm để mua thêm`
+                  ? `Monthly allowance: ${formatNumber(user.monthlyTokens)} credits\n` +
+                    `Purchased: ${formatNumber(user.purchasedTokens)} credits`
+                  : `${formatNumber(user.tokenBalance)} credits — click to buy more`
               }
             >
               <span className="text-sm font-bold text-brand-500">{formatNumber(user.tokenBalance)}</span>
-              <span className="text-[10px] uppercase text-gray-500 tracking-wider hidden sm:inline">điểm</span>
+              <span className="text-[10px] uppercase text-gray-500 tracking-wider hidden sm:inline">credits</span>
               <span className="w-5 h-5 rounded-full bg-brand-500/15 text-brand-500 flex items-center justify-center text-sm leading-none group-hover:bg-brand-500 group-hover:text-white transition-colors">
                 +
               </span>
             </Link>
           ) : (
             <Link
-              to="/nap-tien"
+              to={CREDITS}
               className="bg-brand-500 hover:bg-brand-600 text-white text-xs font-bold rounded-full px-4 py-2 transition-colors"
             >
-              Mua điểm
+              Buy credits
             </Link>
           )}
 
@@ -107,20 +108,20 @@ export const Layout: React.FC = () => {
             <div className="absolute right-0 top-full pt-2 hidden group-hover:block z-50">
               <div className="bg-dark-850 border border-dark-700 rounded-xl shadow-2xl w-56 py-2">
                 <div className="px-4 py-2 border-b border-dark-800">
-                  <p className="text-sm text-gray-100 truncate">{user?.fullName || 'Chưa đặt tên'}</p>
+                  <p className="text-sm text-gray-100 truncate">{user?.fullName || 'No name set'}</p>
                   <p className="text-[11px] text-gray-500 truncate">{user?.email}</p>
                 </div>
-                <Link to="/tai-khoan" className="block px-4 py-2 text-sm text-gray-300 hover:bg-dark-800">
-                  Thông tin tài khoản
+                <Link to={ACCOUNT} className="block px-4 py-2 text-sm text-gray-300 hover:bg-dark-800">
+                  Account settings
                 </Link>
-                <Link to="/vi-diem" className="block px-4 py-2 text-sm text-gray-300 hover:bg-dark-800">
-                  Sao kê điểm
+                <Link to={WALLET} className="block px-4 py-2 text-sm text-gray-300 hover:bg-dark-800">
+                  Credit history
                 </Link>
                 <button
                   onClick={handleLogout}
                   className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-dark-800"
                 >
-                  Đăng xuất
+                  Sign out
                 </button>
               </div>
             </div>

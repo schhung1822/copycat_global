@@ -76,15 +76,15 @@ const Stat: React.FC<{ value: number; suffix?: string; prefix?: string; label: s
 
 /** Từ khoá chạy ngang: cho khách thấy ngay hệ thống hợp với việc gì. */
 const KEYWORDS = [
-  'Ảnh sản phẩm TMĐT',
-  'Banner khuyến mãi',
-  'Ảnh bìa Facebook',
-  'Thumbnail TikTok Shop',
-  'Poster sự kiện',
-  'Ảnh menu quán',
-  'Catalogue thời trang',
-  'Ảnh mỹ phẩm',
-  'Bao bì sản phẩm',
+  'E-commerce product shots',
+  'Promo banners',
+  'Facebook cover images',
+  'TikTok Shop thumbnails',
+  'Event posters',
+  'Restaurant menu photos',
+  'Fashion catalogues',
+  'Cosmetics imagery',
+  'Packaging mockups',
 ];
 
 export const StatsStrip: React.FC = () => (
@@ -112,10 +112,10 @@ export const StatsStrip: React.FC = () => (
     </div>
 
     <div className="mx-auto grid max-w-6xl grid-cols-2 gap-x-4 gap-y-7 px-4 py-8 sm:gap-6 sm:py-10 sm:px-6 lg:grid-cols-4">
-      <Stat value={500000} label="Điểm trong hạn mức mỗi tháng, cấp lại đều đặn" />
-      <Stat value={300} prefix="~" suffix=" ảnh" label="Số ảnh Nano Banana 2 – 2K tạo được trong một tháng" />
-      <Stat value={3} suffix=" model" label="Tạo ảnh được ưu chuộng nhiều nhất từ GPT và Gemini" />
-      <Stat value={11} suffix=" tỉ lệ" label="Phù hợp cho các kênh social và các sàn TMDT" />
+      <Stat value={250000} label="Credits in the most popular pack, and they never expire" />
+      <Stat value={400} prefix="~" suffix=" images" label="Images that pack buys on Nano Banana 2 at 2K" />
+      <Stat value={3} suffix=" models" label="The most trusted image models from OpenAI and Google" />
+      <Stat value={11} suffix=" ratios" label="Sized for every social channel and marketplace" />
     </div>
   </section>
 );

@@ -7,6 +7,7 @@ import { useAuth } from '../context/AuthContext';
 import { api, ApiError } from '../lib/api';
 import { formatNumber, STATUS_LABEL } from '../lib/format';
 import { LABEL_PRODUCT, LABEL_REFERENCE, withRoleLabel } from '../lib/imageLabel';
+import { CREDITS, HISTORY } from '../lib/routes';
 import { getTabSessionId, readTabSettings, writeTabSettings } from '../lib/session';
 import type { Catalog, Generation, ImageState, ModelOption } from '../types';
 
@@ -19,17 +20,17 @@ import type { Catalog, Generation, ImageState, ModelOption } from '../types';
  * trước khi trừ điểm nếu không hợp lệ.
  */
 const ASPECT_RATIOS: { value: string; label: string }[] = [
-  { value: 'auto', label: 'Tự động (3:4 - dọc)' },
-  { value: '1:1', label: '1:1 - Vuông' },
-  { value: '3:4', label: '3:4 - Dọc' },
-  { value: '4:3', label: '4:3 - Ngang' },
-  { value: '4:5', label: '4:5 - Instagram' },
+  { value: 'auto', label: 'Auto (3:4 — portrait)' },
+  { value: '1:1', label: '1:1 — Square' },
+  { value: '3:4', label: '3:4 — Portrait' },
+  { value: '4:3', label: '4:3 — Landscape' },
+  { value: '4:5', label: '4:5 — Instagram' },
   { value: '5:4', label: '5:4' },
-  { value: '9:16', label: '9:16 - Story / Reels' },
-  { value: '16:9', label: '16:9 - Ngang rộng' },
+  { value: '9:16', label: '9:16 — Story / Reels' },
+  { value: '16:9', label: '16:9 — Widescreen' },
   { value: '2:3', label: '2:3' },
   { value: '3:2', label: '3:2' },
-  { value: '21:9', label: '21:9 - Siêu rộng' },
+  { value: '21:9', label: '21:9 — Ultrawide' },
 ];
 const POLL_INTERVAL_MS = 3000;
 const SETTINGS_KEY = 'copycat-studio-settings-v3';
@@ -45,21 +46,21 @@ const SETTINGS_KEY = 'copycat-studio-settings-v3';
  */
 const MODEL_HINTS: Record<string, string> = {
   'nano-banana-pro':
-    'Bám đúng vai trò hai ảnh và dựng lại được bố cục mẫu kể cả khi sản phẩm phải vẽ ở góc khác. ' +
-    'Chọn khi ảnh sản phẩm của bạn cũng là ảnh chụp có bối cảnh, hoặc ảnh mẫu chụp từ góc lạ.',
+    'Keeps both images in their intended roles and rebuilds the reference layout even when your product has to be ' +
+    'redrawn from a different angle. Pick this when your product shot already has a background, or the reference was ' +
+    'taken from an unusual angle.',
   'nano-banana-2':
-    'Nhanh và tiết kiệm hơn. Hợp khi ảnh sản phẩm chụp nền đơn giản; ' +
-    'nếu ảnh sản phẩm cũng là ảnh chụp trong cửa hàng thì có lúc bị ngược — lấy bối cảnh ảnh sản phẩm ' +
-    'thay vì bối cảnh ảnh mẫu.',
-  'nano-banana-2-lite': 'Nhanh nhất, hợp để thử nhiều ý tưởng trước khi chạy bản hoàn chỉnh.',
-  'gpt-image-2': 'Xử lý chữ và bố cục quảng cáo tốt. Chọn khi thiết kế có nhiều chữ hoặc layout phức tạp.',
+    'Faster and cheaper. Great when your product is shot on a plain background; if the product photo also has a busy ' +
+    'setting, it sometimes flips the two and keeps the product photo background instead of the reference one.',
+  'nano-banana-2-lite': 'Fastest option — good for trying several ideas before committing to a final run.',
+  'gpt-image-2': 'Strong with text and ad layouts. Pick this when the design carries a lot of copy or a complex layout.',
 };
 
 /** Gợi ý ngắn cho từng mức chất lượng, hiện ngay dưới nút chọn. */
 const RESOLUTION_HINTS: Record<string, string> = {
-  '1K': 'đăng mạng xã hội',
-  '2K': 'nét hơn, dùng chung',
-  '4K': 'in ấn, khổ lớn',
+  '1K': 'social posts',
+  '2K': 'sharper, all-round',
+  '4K': 'print, large format',
 };
 
 interface StoredSettings {
@@ -148,7 +149,7 @@ export const StudioPage: React.FC = () => {
         if (stored.quantity) setQuantity(stored.quantity);
         if (stored.prompt) setPrompt(stored.prompt);
       } catch (err) {
-        if (!cancelled) setCatalogError(err instanceof ApiError ? err.message : 'Không tải được bảng giá.');
+        if (!cancelled) setCatalogError(err instanceof ApiError ? err.message : 'Could not load the model list.');
       }
     })();
 
@@ -268,7 +269,7 @@ export const StudioPage: React.FC = () => {
       setGenerations((current) => [...data.generations, ...current]);
       setTokenBalance(data.tokenBalance);
     } catch (err) {
-      setError(err instanceof Error ? err : new Error('Không tạo được ảnh.'));
+      setError(err instanceof Error ? err : new Error('Could not start the generation.'));
     } finally {
       setIsSubmitting(false);
     }
@@ -288,7 +289,7 @@ export const StudioPage: React.FC = () => {
       if (data.generation) setGenerations((current) => [data.generation, ...current]);
       setTokenBalance(data.tokenBalance);
     } catch (err) {
-      setError(err instanceof Error ? err : new Error('Không vẽ lại được.'));
+      setError(err instanceof Error ? err : new Error('Could not regenerate that image.'));
     }
   };
 
@@ -306,7 +307,7 @@ export const StudioPage: React.FC = () => {
   const handleDownload = useCallback(async (url: string, fileName: string) => {
     try {
       const response = await fetch(url);
-      if (!response.ok) throw new Error('tải thất bại');
+      if (!response.ok) throw new Error('download failed');
       const blobUrl = URL.createObjectURL(await response.blob());
       const link = document.createElement('a');
       link.href = blobUrl;
@@ -327,7 +328,7 @@ export const StudioPage: React.FC = () => {
       </div>
     );
   }
-  if (!catalog) return <PageLoader label="Đang tải bảng giá..." />;
+  if (!catalog) return <PageLoader label="Loading models…" />;
 
   const canSubmit = Boolean(selectedModel) && prodImages.length > 0 && !notEnoughTokens && !isSubmitting;
 
@@ -337,8 +338,8 @@ export const StudioPage: React.FC = () => {
       <aside className="w-[400px] flex-shrink-0 flex flex-col border-r border-dark-800 bg-dark-900">
         <div className="flex-1 overflow-y-auto p-5 custom-scrollbar space-y-6">
           <ImageUploadBox
-            label="1. Ảnh mẫu (style)"
-            subText="AI học bố cục, ánh sáng và màu sắc từ ảnh này."
+            label="1. Reference image (style)"
+            subText="The AI copies layout, lighting and colour from this image."
             images={refImages}
             onImagesChange={setRefImages}
             allowMultiple
@@ -352,32 +353,32 @@ export const StudioPage: React.FC = () => {
           </div>
 
           <ImageUploadBox
-            label="2. Ảnh sản phẩm"
-            subText="AI sẽ đưa sản phẩm của bạn vào thiết kế."
+            label="2. Product photo"
+            subText="Your product gets placed into the design."
             images={prodImages}
             onImagesChange={setProdImages}
             allowMultiple
             max={3}
           />
           {prodImages.length > 3 && (
-            <p className="text-[11px] text-amber-400 -mt-3">Chỉ 3 ảnh sản phẩm đầu tiên được sử dụng.</p>
+            <p className="text-[11px] text-amber-400 -mt-3">Only the first 3 product photos are used.</p>
           )}
 
           <div className="space-y-2 pt-5 border-t border-dark-800">
             <div className="flex justify-between items-center">
-              <span className="text-sm font-bold text-gray-300 uppercase tracking-wider">3. Mô tả thêm</span>
-              <span className="text-xs text-gray-500">{prompt.length} ký tự</span>
+              <span className="text-sm font-bold text-gray-300 uppercase tracking-wider">3. Extra notes</span>
+              <span className="text-xs text-gray-500">{prompt.length} characters</span>
             </div>
             <textarea
               className="w-full bg-dark-850 border border-dark-700 rounded-xl p-3 text-sm text-gray-200 focus:border-brand-500 outline-none resize-none h-24 placeholder-gray-600 custom-scrollbar"
-              placeholder="VD: Đặt sản phẩm lên bàn gỗ, ánh sáng vàng ấm, thêm lá khô trang trí..."
+              placeholder="e.g. Place the product on a wooden table, warm golden light, scatter dried leaves around…"
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
             />
           </div>
 
           <div className="space-y-4 pt-4 border-t border-dark-800">
-            <span className="text-sm font-bold text-gray-300 uppercase tracking-wider">4. Cấu hình AI</span>
+            <span className="text-sm font-bold text-gray-300 uppercase tracking-wider">4. AI settings</span>
 
             <div>
               <span className="text-xs text-gray-500 mb-2 block">Model</span>
@@ -425,7 +426,7 @@ export const StudioPage: React.FC = () => {
 
             {/* Model chỉ có một mức chất lượng (vd bản Lite) thì không cần cho chọn */}
             <div className={resolutionOptions.length > 1 ? '' : 'hidden'}>
-              <span className="text-xs text-gray-500 mb-1.5 block">Chất lượng</span>
+              <span className="text-xs text-gray-500 mb-1.5 block">Quality</span>
               <div className="flex gap-1.5">
                 {resolutionOptions.map((model) => (
                   <button
@@ -456,7 +457,7 @@ export const StudioPage: React.FC = () => {
 
             {/* Nhãn tỉ lệ khá dài nên để riêng một hàng, đặt cạnh nhau sẽ bị cắt chữ */}
             <div>
-              <span className="text-xs text-gray-500 mb-1.5 block">Tỉ lệ ảnh</span>
+              <span className="text-xs text-gray-500 mb-1.5 block">Aspect ratio</span>
               <select
                 value={aspectRatio}
                 onChange={(e) => setAspectRatio(e.target.value)}
@@ -472,7 +473,7 @@ export const StudioPage: React.FC = () => {
 
             <div>
               <div className="flex justify-between items-center mb-1.5">
-                <span className="text-xs text-gray-500">Số ảnh mỗi mẫu</span>
+                <span className="text-xs text-gray-500">Variants per reference</span>
                 <span className="text-xs font-bold text-brand-500 bg-brand-500/10 px-2 py-0.5 rounded">{quantity}</span>
               </div>
               <input
@@ -495,11 +496,11 @@ export const StudioPage: React.FC = () => {
               {/* Lỗi hết điểm từ server có kèm con số; ở màn này không nói
                   chuyện điểm nên thay bằng câu ngắn gọn của giao diện. */}
               {error instanceof ApiError && error.isInsufficientTokens
-                ? 'Bạn không còn đủ điểm cho số ảnh này.'
+                ? 'You do not have enough credits for this batch.'
                 : error.message}
               {error instanceof ApiError && error.isInsufficientTokens && (
-                <Link to="/nap-tien" className="block mt-2 font-bold underline">
-                  Mua thêm điểm →
+                <Link to={CREDITS} className="block mt-2 font-bold underline">
+                  Buy more credits →
                 </Link>
               )}
             </Alert>
@@ -510,26 +511,28 @@ export const StudioPage: React.FC = () => {
             trang mua điểm thay vì bấm nút "Tạo" rồi ăn lỗi 402.
           */}
           {notEnoughTokens ? (
-            <Link to="/nap-tien" className="block">
+            <Link to={CREDITS} className="block">
               <Button className="w-full !rounded-xl" variant={balance === 0 ? 'primary' : 'secondary'}>
-                {balance === 0 ? 'Mua điểm để bắt đầu' : 'Không đủ điểm · Mua thêm'}
+                {balance === 0 ? 'Buy credits to get started' : 'Not enough credits · Buy more'}
               </Button>
             </Link>
           ) : (
             <Button onClick={handleGenerate} isLoading={isSubmitting} disabled={!canSubmit} className="w-full !rounded-xl">
-              {prodImages.length === 0 ? 'Cần ít nhất 1 ảnh sản phẩm' : `Tạo ${jobCount} thiết kế`}
+              {prodImages.length === 0
+                ? 'Add at least 1 product photo'
+                : `Generate ${jobCount} design${jobCount > 1 ? 's' : ''}`}
             </Button>
           )}
 
           <p className="text-[11px] text-gray-600 text-center leading-relaxed">
             {remainingImages !== null && remainingImages > 0 && (
               <>
-                Còn tạo được khoảng <strong className="text-gray-500">{formatNumber(remainingImages)} ảnh</strong> ở mức
-                chất lượng này.
+                About <strong className="text-gray-500">{formatNumber(remainingImages)} more images</strong> at this
+                quality level.
                 <br />
               </>
             )}
-            Ảnh lỗi được hoàn điểm tự động.
+            Failed images are refunded automatically.
           </p>
         </div>
       </aside>
@@ -538,7 +541,7 @@ export const StudioPage: React.FC = () => {
       <section className="flex-1 flex flex-col overflow-hidden">
         <div className="h-14 border-b border-dark-800 flex items-center justify-between px-6 shrink-0 gap-4">
           <div className="flex items-center gap-2.5 min-w-0">
-            <h2 className="text-base font-semibold text-gray-200 truncate">Kết quả gần đây</h2>
+            <h2 className="text-base font-semibold text-gray-200 truncate">Recent results</h2>
             {generations.length > 0 && (
               <span className="text-[11px] font-bold text-gray-500 bg-dark-850 border border-dark-800 rounded-full px-2 py-0.5 shrink-0">
                 {generations.length}
@@ -547,7 +550,7 @@ export const StudioPage: React.FC = () => {
             {pendingIds.length > 0 && (
               <span className="flex items-center gap-1.5 text-[11px] text-brand-500 bg-brand-500/10 rounded-full px-2.5 py-0.5 shrink-0">
                 <span className="w-1.5 h-1.5 rounded-full bg-brand-500 animate-pulse" />
-                {pendingIds.length} đang vẽ
+                {pendingIds.length} in progress
               </span>
             )}
           </div>
@@ -556,7 +559,7 @@ export const StudioPage: React.FC = () => {
               <button
                 onClick={clearFinished}
                 className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-100 transition-colors"
-                title="Ẩn các ảnh đã xong khỏi màn hình. Ảnh vẫn được lưu trong Lịch sử."
+                title="Hide finished images from this screen. They stay in your History."
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path
@@ -566,11 +569,11 @@ export const StudioPage: React.FC = () => {
                     d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
                   />
                 </svg>
-                Làm mới
+                Clear
               </button>
             )}
-            <Link to="/lich-su" className="text-xs text-gray-500 hover:text-gray-100 transition-colors whitespace-nowrap">
-              Xem toàn bộ lịch sử →
+            <Link to={HISTORY} className="text-xs text-gray-500 hover:text-gray-100 transition-colors whitespace-nowrap">
+              See full history →
             </Link>
           </div>
         </div>
@@ -588,13 +591,13 @@ export const StudioPage: React.FC = () => {
                   />
                 </svg>
               </div>
-              <p className="text-base font-semibold text-gray-300">Bắt đầu một phiên làm việc mới</p>
+              <p className="text-base font-semibold text-gray-300">Start a new session</p>
               <p className="text-sm mt-1.5 text-gray-500 text-center max-w-sm leading-relaxed">
-                Tải một ảnh mẫu bạn thích và ảnh sản phẩm của mình ở cột bên trái, AI sẽ dựng lại bố cục đó cho sản
-                phẩm của bạn.
+                Upload a reference design you like plus your own product photo on the left, and the AI rebuilds that
+                layout around your product.
               </p>
-              <Link to="/lich-su" className="text-xs text-gray-500 hover:text-brand-500 transition-colors mt-4">
-                Ảnh đã tạo trước đó nằm trong Lịch sử →
+              <Link to={HISTORY} className="text-xs text-gray-500 hover:text-brand-500 transition-colors mt-4">
+                Earlier images live in your History →
               </Link>
             </div>
           ) : (
@@ -628,7 +631,7 @@ export const StudioPage: React.FC = () => {
           </button>
           <img
             src={previewUrl}
-            alt="Xem lớn"
+            alt="Full size preview"
             className="max-w-full max-h-full object-contain rounded-lg border border-white/10"
             onClick={(e) => e.stopPropagation()}
           />
@@ -638,22 +641,22 @@ export const StudioPage: React.FC = () => {
       {redoTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
           <div className="bg-dark-900 border border-dark-700 rounded-2xl w-full max-w-lg p-6 shadow-2xl">
-            <h3 className="text-xl font-bold text-gray-100 mb-1">Vẽ lại thiết kế</h3>
+            <h3 className="text-xl font-bold text-gray-100 mb-1">Regenerate this design</h3>
             <p className="text-sm text-gray-500 mb-4">
-              Dùng lại đúng ảnh mẫu và ảnh sản phẩm cũ, chỉ đổi mô tả. Ảnh vẽ lại tính là một ảnh mới.
+              Reuses the same reference and product photos — only your notes change. This counts as a new image.
             </p>
             <textarea
               className="w-full bg-dark-850 border border-dark-700 rounded-xl p-3 text-gray-100 focus:border-brand-500 outline-none min-h-[120px] mb-4 custom-scrollbar text-sm"
-              placeholder="VD: Thêm logo góc trái, làm sáng nền, đổi tông sang xanh navy..."
+              placeholder="e.g. Add a logo top-left, brighten the background, shift the palette to navy…"
               value={redoPrompt}
               onChange={(e) => setRedoPrompt(e.target.value)}
               autoFocus
             />
             <div className="flex justify-end gap-3">
               <Button variant="ghost" onClick={() => setRedoTarget(null)}>
-                Huỷ
+                Cancel
               </Button>
-              <Button onClick={handleRedo}>Vẽ lại</Button>
+              <Button onClick={handleRedo}>Regenerate</Button>
             </div>
           </div>
         </div>
@@ -674,12 +677,12 @@ const GenerationCard: React.FC<{
     <div className="relative aspect-[3/4] bg-dark-850">
       {generation.status === 'success' && generation.imageUrl ? (
         <>
-          <img src={generation.imageUrl} alt="Kết quả" className="w-full h-full object-contain" />
+          <img src={generation.imageUrl} alt="Generated design" className="w-full h-full object-contain" />
           <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 backdrop-blur-sm">
             <button
               onClick={() => onDownload(generation.imageUrl!, `copycat-${generation.id}.png`)}
               className="bg-white hover:bg-gray-100 text-black p-3 rounded-full transition-transform hover:scale-110"
-              title="Tải xuống"
+              title="Download"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -688,7 +691,7 @@ const GenerationCard: React.FC<{
             <button
               onClick={() => onPreview(generation.imageUrl!)}
               className="bg-dark-700 hover:bg-dark-600 text-gray-100 p-3 rounded-full border border-gray-600 transition-transform hover:scale-110"
-              title="Xem lớn"
+              title="View full size"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -698,7 +701,7 @@ const GenerationCard: React.FC<{
             <button
               onClick={() => onRedo(generation)}
               className="bg-brand-600 hover:bg-brand-500 text-white p-3 rounded-full transition-transform hover:scale-110"
-              title="Vẽ lại"
+              title="Regenerate"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
@@ -710,10 +713,10 @@ const GenerationCard: React.FC<{
         <div className="w-full h-full flex flex-col items-center justify-center bg-red-950/20 p-4 text-center gap-2">
           <span className="text-xs text-red-400 line-clamp-4">{generation.errorMessage}</span>
           {generation.status === 'refunded' && (
-            <span className="text-[10px] text-green-500">Đã hoàn lại, không tính vào hạn mức</span>
+            <span className="text-[10px] text-green-500">Refunded — no credits were charged</span>
           )}
           <button onClick={() => onRedo(generation)} className="text-[11px] text-gray-100 underline mt-1">
-            Thử lại
+            Try again
           </button>
         </div>
       ) : (
@@ -730,8 +733,8 @@ const GenerationCard: React.FC<{
           <img
             src={generation.referenceUrl}
             className="w-6 h-6 rounded border border-dark-700 object-cover shrink-0"
-            alt="mẫu"
-            title="Ảnh mẫu"
+            alt="reference"
+            title="Reference image"
           />
         )}
         <div className="flex -space-x-1.5">
@@ -740,8 +743,8 @@ const GenerationCard: React.FC<{
               key={url}
               src={url}
               className="w-6 h-6 rounded-full border border-dark-900 object-cover"
-              alt="sản phẩm"
-              title="Ảnh sản phẩm"
+              alt="product"
+              title="Product photo"
             />
           ))}
         </div>

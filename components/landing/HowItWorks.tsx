@@ -13,32 +13,32 @@ import { SectionHeading } from './SectionHeading';
  */
 const STEPS = [
   {
-    tag: 'Bước 1',
-    title: 'Tải ảnh mẫu bạn muốn bắt chước',
-    body: 'Ảnh chụp màn hình một quảng cáo đẹp, một trang catalogue hay bất kỳ bố cục nào bạn thích. Tải được nhiều ảnh mẫu cùng lúc để so sánh phong cách.',
+    tag: 'Step 1',
+    title: 'Upload the design you want to copy',
+    body: 'A screenshot of an ad you like, a catalogue page, or any layout at all. Upload several references at once to compare styles.',
     image: '/img/b1.webp',
-    imageAlt: 'Màn hình tải ảnh mẫu lên hệ thống',
+    imageAlt: 'Uploading a reference design to the studio',
   },
   {
-    tag: 'Bước 2',
-    title: 'Tải ảnh sản phẩm của bạn',
-    body: 'Ảnh chụp bằng điện thoại cũng được. Hệ thống giữ đúng hình dáng, màu sắc và chi tiết sản phẩm khi dựng lại theo bố cục mẫu.',
+    tag: 'Step 2',
+    title: 'Upload your product photo',
+    body: 'A phone snapshot is fine. The system keeps your product\u2019s shape, colour and details intact while rebuilding the reference layout around it.',
     image: '/img/b2.webp',
-    imageAlt: 'Màn hình tải ảnh sản phẩm lên hệ thống',
+    imageAlt: 'Uploading a product photo to the studio',
   },
   {
-    tag: 'Bước 3',
-    title: 'Chọn model, độ phân giải và tỉ lệ khung',
-    body: 'Mỗi model có thế mạnh riêng và mức điểm khác nhau. Chọn 1K để thử nhanh, 4K khi cần file in. Thêm ghi chú nếu muốn đổi màu nền hay bỏ bớt chữ.',
+    tag: 'Step 3',
+    title: 'Pick a model, resolution and aspect ratio',
+    body: 'Each model has its own strengths and credit cost. Use 1K for quick tests, 4K when you need a print file. Add a note if you want a different background or less text.',
     image: '/img/b3.webp',
-    imageAlt: 'Bảng chọn model, độ phân giải và tỉ lệ khung hình',
+    imageAlt: 'Model, resolution and aspect ratio picker',
   },
   {
-    tag: 'Bước 4',
-    title: 'Nhận ảnh, tải về hoặc tạo lại',
-    body: 'Mỗi ảnh mẫu tạo được tối đa 4 phương án một lượt. Ảnh xong lưu vào Lịch sử, tải về bất cứ lúc nào. Không ưng thì sửa ghi chú và chạy lại.',
+    tag: 'Step 4',
+    title: 'Get your images, download or rerun',
+    body: 'Up to 4 variants per reference in a single run. Finished images go to your History and can be downloaded any time. Not quite right? Tweak the note and run it again.',
     image: '/img/b4.webp',
-    imageAlt: 'Lưới ảnh kết quả kèm nút tải về và tạo lại',
+    imageAlt: 'Grid of generated results with download and regenerate buttons',
   },
 ];
 
@@ -54,9 +54,9 @@ const ImagePlaceholder: React.FC<{ index: number }> = ({ index }) => (
         />
       </svg>
     </span>
-    <p className="text-sm font-semibold text-gray-400">Ảnh minh hoạ bước {index + 1}</p>
+    <p className="text-sm font-semibold text-gray-400">Screenshot for step {index + 1}</p>
     <p className="max-w-[18rem] text-xs leading-relaxed text-gray-600">
-      Điền đường dẫn ảnh vào <span className="font-mono text-gray-500">STEPS[{index}].image</span> trong{' '}
+      Set the image path in <span className="font-mono text-gray-500">STEPS[{index}].image</span> inside{' '}
       <span className="font-mono text-gray-500">HowItWorks.tsx</span>.
     </p>
   </div>
@@ -105,7 +105,7 @@ const ImageLightbox: React.FC<{
     <div
       role="dialog"
       aria-modal="true"
-      aria-label={`Ảnh minh hoạ ${step.tag.toLowerCase()} — ${step.title}`}
+      aria-label={`Screenshot for ${step.tag.toLowerCase()} — ${step.title}`}
       /* Bấm ra ngoài để đóng. Ảnh và các nút gọi stopPropagation nên bấm trúng
          chúng không bị tính là bấm nền. */
       onClick={onClose}
@@ -114,7 +114,7 @@ const ImageLightbox: React.FC<{
       <button
         type="button"
         onClick={onClose}
-        aria-label="Đóng ảnh phóng to"
+        aria-label="Close enlarged image"
         className="absolute right-3 top-3 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20 sm:right-5 sm:top-5"
       >
         <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2} aria-hidden>
@@ -132,7 +132,7 @@ const ImageLightbox: React.FC<{
                 event.stopPropagation();
                 onNavigate(delta);
               }}
-              aria-label={delta < 0 ? 'Xem bước trước' : 'Xem bước sau'}
+              aria-label={delta < 0 ? 'Previous step' : 'Next step'}
               className={`absolute top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20 sm:h-12 sm:w-12 ${
                 delta < 0 ? 'left-2 sm:left-5' : 'right-2 sm:right-5'
               }`}
@@ -200,20 +200,21 @@ export const HowItWorks: React.FC = () => {
     event.preventDefault();
     const next = (activeIndex + step + STEPS.length) % STEPS.length;
     setActiveIndex(next);
-    document.getElementById(`quy-trinh-tab-${next}`)?.focus();
+    document.getElementById(`how-it-works-tab-${next}`)?.focus();
   };
 
   return (
-    <section id="quy-trinh" className="scroll-mt-20 py-14 sm:py-20 lg:py-28">
+    <section id="how-it-works" className="scroll-mt-20 py-14 sm:py-20 lg:py-28">
       <div className="mx-auto max-w-[1280px] px-4 sm:px-6">
         <SectionHeading
-          eyebrow="Quy trình"
+          eyebrow="How it works"
           title={
             <>
-              Bốn bước, từ ảnh mẫu tới <br></br><span className="lp-gradient-text">ảnh đăng được ngay</span>
+              Four steps, from reference to <br></br>
+              <span className="lp-gradient-text">a post-ready image</span>
             </>
           }
-          description="Không có bảng điều khiển rối rắm, không có thuật ngữ kỹ thuật. Ai bán hàng online cũng làm được trong lần đầu tiên."
+          description="No confusing dashboard, no technical jargon. Anyone selling online gets it right on the first try."
         />
 
         <div className="mt-10 grid sm:mt-14 gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:items-start lg:gap-12">
@@ -233,7 +234,7 @@ export const HowItWorks: React.FC = () => {
             <div
               role="tablist"
               aria-orientation="vertical"
-              aria-label="Các bước trong quy trình"
+              aria-label="Steps in the workflow"
               onKeyDown={onKeyDown}
               className="space-y-3"
             >
@@ -254,11 +255,11 @@ export const HowItWorks: React.FC = () => {
                     </span>
 
                     <button
-                      id={`quy-trinh-tab-${index}`}
+                      id={`how-it-works-tab-${index}`}
                       role="tab"
                       type="button"
                       aria-selected={isActive}
-                      aria-controls={`quy-trinh-panel-${index}`}
+                      aria-controls={`how-it-works-panel-${index}`}
                       tabIndex={isActive ? 0 : -1}
                       onClick={() => setActiveIndex(index)}
                       className={`flex-1 rounded-2xl border p-4 text-left transition-all duration-300 sm:p-5 ${
@@ -311,9 +312,9 @@ export const HowItWorks: React.FC = () => {
                   return (
                     <div
                       key={step.tag}
-                      id={`quy-trinh-panel-${index}`}
+                      id={`how-it-works-panel-${index}`}
                       role="tabpanel"
-                      aria-labelledby={`quy-trinh-tab-${index}`}
+                      aria-labelledby={`how-it-works-tab-${index}`}
                       /* Ẩn khỏi cây trợ năng khi không hiện, nếu không trình đọc
                          màn hình sẽ đọc cả bốn ảnh chồng lên nhau. */
                       aria-hidden={!isActive}
@@ -333,7 +334,7 @@ export const HowItWorks: React.FC = () => {
                         <button
                           type="button"
                           onClick={() => setIsZoomed(true)}
-                          aria-label={`Phóng to ảnh ${step.tag.toLowerCase()}: ${step.imageAlt}`}
+                          aria-label={`Enlarge the ${step.tag.toLowerCase()} screenshot: ${step.imageAlt}`}
                           className="group/zoom relative block h-full w-full cursor-zoom-in overflow-hidden outline-none"
                         >
                           <img
@@ -383,7 +384,7 @@ export const HowItWorks: React.FC = () => {
                       key={step.tag}
                       type="button"
                       onClick={() => setActiveIndex(index)}
-                      aria-label={`Xem ${step.tag.toLowerCase()}`}
+                      aria-label={`View ${step.tag.toLowerCase()}`}
                       className={`h-1.5 rounded-full transition-all duration-300 ${
                         index === activeIndex ? 'w-6 bg-brand-500' : 'w-1.5 bg-dark-700 hover:bg-dark-600'
                       }`}

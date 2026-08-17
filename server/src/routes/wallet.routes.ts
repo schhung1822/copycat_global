@@ -15,8 +15,13 @@ walletRouter.get(
   '/',
   asyncHandler(async (req, res) => {
     const summary = await queryOne<
-      RowDataPacket & { token_balance: number; total_topup_vnd: number; total_tokens_in: number; total_tokens_out: number }
-    >('SELECT token_balance, total_topup_vnd, total_tokens_in, total_tokens_out FROM users WHERE id = ?', [
+      RowDataPacket & {
+        token_balance: number;
+        total_topup_usd_cents: number;
+        total_tokens_in: number;
+        total_tokens_out: number;
+      }
+    >('SELECT token_balance, total_topup_usd_cents, total_tokens_in, total_tokens_out FROM users WHERE id = ?', [
       req.user!.id,
     ]);
 
@@ -41,7 +46,7 @@ walletRouter.get(
       isSubscribed: state.isSubscribed,
       subscriptionExpiresAt: state.subscriptionExpiresAt,
       subscriptionName: subscription?.plan_name ?? null,
-      totalTopupVnd: summary?.total_topup_vnd ?? 0,
+      totalTopupUsdCents: summary?.total_topup_usd_cents ?? 0,
       totalTokensIn: summary?.total_tokens_in ?? 0,
       totalTokensOut: summary?.total_tokens_out ?? 0,
       totalImages: Number(images?.total ?? 0),

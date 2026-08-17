@@ -4,7 +4,7 @@ import { PasswordInput } from '../../components/PasswordInput';
 import { Alert, Badge, Card, EmptyState, Field, TableWrap, inputClass, selectClass } from '../../components/ui';
 import { useAuth } from '../../context/AuthContext';
 import { api, ApiError, qs } from '../../lib/api';
-import { formatDateTime, formatNumber, formatVnd, STATUS_LABEL } from '../../lib/format';
+import { formatDateTimeVi, formatNumberVi, formatUsd, STATUS_LABEL_VI } from '../../lib/format';
 import type { AdminPlan, AdminUser } from '../../types';
 
 /**
@@ -171,7 +171,7 @@ export const UsersTab: React.FC = () => {
                           <p className={`text-xs ${expired ? 'text-gray-600' : 'text-gray-300'}`}>{user.planName}</p>
                           <p className={`text-[10px] ${expired ? 'text-red-400' : 'text-gray-600'}`}>
                             {expired ? 'Hết hạn ' : 'Đến '}
-                            {formatDateTime(user.subscriptionExpiresAt)}
+                            {formatDateTimeVi(user.subscriptionExpiresAt)}
                           </p>
                         </>
                       ) : (
@@ -180,22 +180,22 @@ export const UsersTab: React.FC = () => {
                     </td>
 
                     <td className="py-2.5 text-right whitespace-nowrap">
-                      <span className="text-brand-500 font-semibold">{formatNumber(user.monthlyTokens)}</span>
-                      <span className="text-gray-600"> / {formatNumber(user.monthlyAllowance)}</span>
+                      <span className="text-brand-500 font-semibold">{formatNumberVi(user.monthlyTokens)}</span>
+                      <span className="text-gray-600"> / {formatNumberVi(user.monthlyAllowance)}</span>
                       {user.monthlyPeriodEnd && (
                         <p className="text-[10px] text-gray-600">
-                          Cấp lại {formatDateTime(user.monthlyPeriodEnd)}
+                          Cấp lại {formatDateTimeVi(user.monthlyPeriodEnd)}
                         </p>
                       )}
                     </td>
 
-                    <td className="py-2.5 text-right text-gray-300">{formatNumber(user.purchasedTokens)}</td>
-                    <td className="py-2.5 text-right text-gray-300">{formatVnd(user.totalTopupVnd)}</td>
+                    <td className="py-2.5 text-right text-gray-300">{formatNumberVi(user.purchasedTokens)}</td>
+                    <td className="py-2.5 text-right text-gray-300">{formatUsd(user.totalTopupUsdCents)}</td>
 
                     <td className="py-2.5 pl-4">
-                      <Badge status={user.status}>{STATUS_LABEL[user.status]}</Badge>
+                      <Badge status={user.status}>{STATUS_LABEL_VI[user.status]}</Badge>
                       <p className="text-[10px] text-gray-600 mt-1 whitespace-nowrap">
-                        {formatDateTime(user.lastLoginAt)}
+                        {formatDateTimeVi(user.lastLoginAt)}
                       </p>
                     </td>
 
@@ -334,7 +334,7 @@ const EditUserModal: React.FC<{
       <Card className="w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto custom-scrollbar">
         <h3 className="text-lg font-bold text-gray-100">Sửa thông tin khách hàng</h3>
         <p className="text-sm text-gray-500 mt-1 mb-5">
-          #{user.id} · tham gia {formatDateTime(user.createdAt)}
+          #{user.id} · tham gia {formatDateTimeVi(user.createdAt)}
         </p>
 
         <form onSubmit={submit} className="space-y-5">
@@ -385,7 +385,7 @@ const EditUserModal: React.FC<{
                 <input className={inputClass} type="datetime-local" {...field('monthlyPeriodEnd')} />
               </Field>
               <div className="text-[11px] text-gray-600 self-end pb-2">
-                Hạn mức còn lại hiện tại: <strong className="text-gray-400">{formatNumber(user.monthlyTokens)}</strong>{' '}
+                Hạn mức còn lại hiện tại: <strong className="text-gray-400">{formatNumberVi(user.monthlyTokens)}</strong>{' '}
                 điểm. Cộng/trừ số này ở nút <strong className="text-gray-400">Điểm</strong> để có dòng ghi trong sổ cái.
                 Hạ hạn mức tháng xuống thấp hơn số còn lại sẽ kéo số còn lại xuống theo.
               </div>
@@ -423,7 +423,7 @@ const EditUserModal: React.FC<{
 // ---------------------------------------------------------------------------
 
 /**
- * Cấp gói tháng thẳng cho một khách, không qua đơn chuyển khoản.
+ * Cấp gói tháng thẳng cho một khách, không qua đơn thanh toán nào.
  *
  * Gói tháng ĐÃ NGỪNG BÁN — hệ thống nay chỉ bán điểm. Đường này giữ lại cho
  * trường hợp tặng hạn mức tháng cho khách VIP hoặc khách trả tiền ngoài luồng.
@@ -498,7 +498,7 @@ const GrantPlanModal: React.FC<{
         { planId: selected.id, months: value, mode },
       );
       await onDone(
-        `Đã cấp ${selected.name} (${value} tháng) cho ${user.email} — hiệu lực đến ${formatDateTime(data.expiresAt)}.`,
+        `Đã cấp ${selected.name} (${value} tháng) cho ${user.email} — hiệu lực đến ${formatDateTimeVi(data.expiresAt)}.`,
       );
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Cấp gói thất bại.');
@@ -521,12 +521,12 @@ const GrantPlanModal: React.FC<{
               {' · '}
               {stillValid ? 'còn hạn đến ' : 'đã hết hạn '}
               <strong className={stillValid ? 'text-gray-300' : 'text-red-400'}>
-                {formatDateTime(user.subscriptionExpiresAt)}
+                {formatDateTimeVi(user.subscriptionExpiresAt)}
               </strong>
             </>
           )}
           {' · hạn mức '}
-          <strong className="text-gray-300">{formatNumber(user.monthlyAllowance)}</strong> điểm/tháng
+          <strong className="text-gray-300">{formatNumberVi(user.monthlyAllowance)}</strong> điểm/tháng
         </div>
 
         <form onSubmit={submit} className="space-y-4">
@@ -542,9 +542,9 @@ const GrantPlanModal: React.FC<{
               {!plans && <option value="">Đang tải...</option>}
               {plans?.map((plan) => (
                 <option key={plan.id} value={plan.id}>
-                  {plan.name} — {plan.priceVnd > 0 ? formatVnd(plan.priceVnd) : 'miễn phí'} ·{' '}
+                  {plan.name} — {plan.priceUsdCents > 0 ? formatUsd(plan.priceUsdCents) : 'miễn phí'} ·{' '}
                   {plan.monthlyTokenAllowance > 0
-                    ? `${formatNumber(plan.monthlyTokenAllowance)} điểm/tháng`
+                    ? `${formatNumberVi(plan.monthlyTokenAllowance)} điểm/tháng`
                     : 'không tặng điểm'}
                   {plan.isActive ? '' : ' (ngừng bán)'}
                 </option>
@@ -585,7 +585,7 @@ const GrantPlanModal: React.FC<{
           )}
 
           <p className="text-[11px] text-gray-600">
-            Thao tác này không tạo đơn nạp và không tính vào doanh thu. Khách đã chuyển khoản thì duyệt đơn ở tab{' '}
+            Thao tác này không tạo đơn nạp và không tính vào doanh thu. Khách đã trả tiền thật thì duyệt đơn ở tab{' '}
             <strong className="text-gray-400">Đơn nạp</strong> thay vì cấp tay ở đây.
           </p>
 
@@ -634,9 +634,9 @@ const AdjustTokenModal: React.FC<{
         bucket,
       });
       await onDone(
-        `Đã ${value > 0 ? 'cộng' : 'trừ'} ${formatNumber(Math.abs(value))} điểm ` +
+        `Đã ${value > 0 ? 'cộng' : 'trừ'} ${formatNumberVi(Math.abs(value))} điểm ` +
           `(${isMonthly ? 'hạn mức tháng' : 'điểm mua thêm'}) cho ${user.email}. ` +
-          `Còn lại: ${formatNumber(data.balanceAfter)}.`,
+          `Còn lại: ${formatNumberVi(data.balanceAfter)}.`,
       );
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Thao tác thất bại.');
@@ -658,7 +658,7 @@ const AdjustTokenModal: React.FC<{
             label="Nguồn điểm"
             hint={
               isMonthly
-                ? `Hạn mức tháng bị xoá khi sang chu kỳ mới. Không cộng vượt quá ${formatNumber(user.monthlyAllowance)} điểm của gói.`
+                ? `Hạn mức tháng bị xoá khi sang chu kỳ mới. Không cộng vượt quá ${formatNumberVi(user.monthlyAllowance)} điểm của gói.`
                 : 'Điểm mua thêm không hết hạn. Dùng cho đền bù, khuyến mãi.'
             }
           >
@@ -672,7 +672,7 @@ const AdjustTokenModal: React.FC<{
             </select>
           </Field>
 
-          <Field label="Số điểm" hint={`Đang có ${formatNumber(currentBalance)}. Số dương để cộng, số âm để trừ.`}>
+          <Field label="Số điểm" hint={`Đang có ${formatNumberVi(currentBalance)}. Số dương để cộng, số âm để trừ.`}>
             <input
               className={inputClass}
               value={amount}

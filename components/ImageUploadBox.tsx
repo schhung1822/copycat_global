@@ -74,11 +74,11 @@ export const ImageUploadBox: React.FC<ImageUploadBoxProps> = ({
           onImagesChange([newImages[0]]);
         }
       } else {
-        alert("Không tìm thấy hình ảnh trong bộ nhớ tạm. Hãy thử nhấn Ctrl+V.");
+        alert("No image found on your clipboard. Try pressing Ctrl+V instead.");
       }
     } catch (err) {
       console.warn("Clipboard API blocked", err);
-      alert("Trình duyệt chặn dán tự động. Vui lòng nhấn Ctrl+V vào vùng upload.");
+      alert("Your browser blocked clipboard access. Click the upload area and press Ctrl+V.");
     }
   };
 
@@ -152,12 +152,12 @@ export const ImageUploadBox: React.FC<ImageUploadBoxProps> = ({
         <button
           onClick={handlePasteButtonClick}
           className="text-[11px] text-gray-500 hover:text-brand-500 px-2 py-1 rounded-lg hover:bg-dark-850 flex items-center gap-1 transition-colors shrink-0"
-          title="Dán từ Clipboard (hoặc nhấn Ctrl+V)"
+          title="Paste from clipboard (or press Ctrl+V)"
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
           </svg>
-          Dán ảnh
+          Paste
         </button>
       </div>
 
@@ -188,10 +188,10 @@ export const ImageUploadBox: React.FC<ImageUploadBoxProps> = ({
             </div>
 
             {isDragging ? (
-              <p className="text-brand-500 font-semibold text-sm">Thả ảnh vào đây</p>
+              <p className="text-brand-500 font-semibold text-sm">Drop the image here</p>
             ) : (
               <p className="text-gray-300 text-sm">
-                Nhấn, kéo thả hoặc{' '}
+                Click, drag &amp; drop, or{' '}
                 <kbd className="px-1.5 py-0.5 rounded bg-dark-800 border border-dark-700 text-[10px] font-bold text-gray-300 align-middle">
                   Ctrl+V
                 </kbd>
@@ -215,7 +215,7 @@ export const ImageUploadBox: React.FC<ImageUploadBoxProps> = ({
                 key={idx}
                 className="relative aspect-square group rounded-xl overflow-hidden border border-dark-700 bg-dark-800"
               >
-                <img src={img.previewUrl || ''} alt={`Ảnh ${idx + 1}`} className="w-full h-full object-cover" />
+                <img src={img.previewUrl || ''} alt={`Image ${idx + 1}`} className="w-full h-full object-cover" />
 
                 {/* Số thứ tự: ảnh mẫu đầu tiên là ảnh AI học bố cục, biết thứ tự là có ích */}
                 <span className="absolute bottom-1 left-1 text-[9px] font-bold text-white bg-black/60 rounded px-1.5 py-0.5">
@@ -228,7 +228,7 @@ export const ImageUploadBox: React.FC<ImageUploadBoxProps> = ({
                     removeImage(idx);
                   }}
                   className="absolute top-1 right-1 bg-black/60 hover:bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-all"
-                  title="Xoá ảnh này"
+                  title="Remove this image"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
                     <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
@@ -244,7 +244,7 @@ export const ImageUploadBox: React.FC<ImageUploadBoxProps> = ({
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
               </svg>
-              <span className="text-[10px] mt-1">Thêm</span>
+              <span className="text-[10px] mt-1">Add</span>
             </button>
           </div>
         </div>

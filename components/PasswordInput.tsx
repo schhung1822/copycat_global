@@ -11,7 +11,7 @@ type PasswordInputProps = Omit<React.InputHTMLAttributes<HTMLInputElement>, 'typ
 
 export const PasswordInput: React.FC<PasswordInputProps> = ({ className = '', ...props }) => {
   const [visible, setVisible] = useState(false);
-  const label = visible ? 'Ẩn mật khẩu' : 'Hiện mật khẩu';
+  const label = visible ? 'Hide password' : 'Show password';
 
   return (
     <div className="relative">

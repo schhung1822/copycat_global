@@ -7,7 +7,7 @@ import { Alert, Field, inputClass } from '../components/ui';
 import { useAuth } from '../context/AuthContext';
 import { ApiError } from '../lib/api';
 import { getStoredReferral } from '../lib/referral';
-import { APP_HOME } from '../lib/routes';
+import { APP_HOME, CREDITS, FORGOT_PASSWORD, LOGIN, SIGNUP } from '../lib/routes';
 
 /** Khung chung của các màn hình ngoài ứng dụng; dùng lại ở trang quên mật khẩu. */
 export const AuthShell: React.FC<{
@@ -67,7 +67,7 @@ export const LoginPage: React.FC = () => {
       await login(email, password);
       navigate((location.state as { from?: string })?.from ?? APP_HOME, { replace: true });
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Đăng nhập thất bại.');
+      setError(err instanceof ApiError ? err.message : 'Sign-in failed.');
     } finally {
       setIsSubmitting(false);
     }
@@ -75,13 +75,13 @@ export const LoginPage: React.FC = () => {
 
   return (
     <AuthShell
-      title="Đăng nhập"
-      subtitle="Đăng nhập để tiếp tục tạo thiết kế."
+      title="Sign in"
+      subtitle="Sign in to keep creating."
       footer={
         <>
-          Chưa có tài khoản?{' '}
-          <Link to="/dang-ky" className="text-brand-500 hover:underline font-semibold">
-            Đăng ký ngay
+          No account yet?{' '}
+          <Link to={SIGNUP} className="text-brand-500 hover:underline font-semibold">
+            Create one
           </Link>
         </>
       }
@@ -101,7 +101,7 @@ export const LoginPage: React.FC = () => {
           />
         </Field>
 
-        <Field label="Mật khẩu">
+        <Field label="Password">
           <PasswordInput
             value={password}
             onChange={(e) => setPassword(e.target.value)}
@@ -112,13 +112,13 @@ export const LoginPage: React.FC = () => {
         </Field>
 
         <div className="flex justify-end">
-          <Link to="/quen-mat-khau" className="text-xs text-gray-500 hover:text-brand-500">
-            Quên mật khẩu?
+          <Link to={FORGOT_PASSWORD} className="text-xs text-gray-500 hover:text-brand-500">
+            Forgot your password?
           </Link>
         </div>
 
         <Button type="submit" isLoading={isSubmitting} className="w-full !rounded-xl">
-          Đăng nhập
+          Sign in
         </Button>
       </form>
     </AuthShell>
@@ -147,8 +147,8 @@ export const RegisterPage: React.FC = () => {
     event.preventDefault();
     setError(null);
 
-    if (form.password.length < 6) return setError('Mật khẩu phải có ít nhất 6 ký tự.');
-    if (form.password !== form.confirm) return setError('Hai mật khẩu không khớp nhau.');
+    if (form.password.length < 6) return setError('Password must be at least 6 characters.');
+    if (form.password !== form.confirm) return setError('The two passwords do not match.');
 
     setIsSubmitting(true);
     try {
@@ -158,9 +158,9 @@ export const RegisterPage: React.FC = () => {
         fullName: form.fullName || undefined,
         phone: form.phone || undefined,
       });
-      navigate('/nap-tien', { replace: true });
+      navigate(CREDITS, { replace: true });
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Đăng ký thất bại.');
+      setError(err instanceof ApiError ? err.message : 'Sign-up failed.');
     } finally {
       setIsSubmitting(false);
     }
@@ -168,13 +168,13 @@ export const RegisterPage: React.FC = () => {
 
   return (
     <AuthShell
-      title="Tạo tài khoản"
-      subtitle="Đăng ký miễn phí, nạp điểm khi cần tạo ảnh."
+      title="Create your account"
+      subtitle="Free to join — buy credits whenever you need them."
       footer={
         <>
-          Đã có tài khoản?{' '}
-          <Link to="/dang-nhap" className="text-brand-500 hover:underline font-semibold">
-            Đăng nhập
+          Already have an account?{' '}
+          <Link to={LOGIN} className="text-brand-500 hover:underline font-semibold">
+            Sign in
           </Link>
         </>
       }
@@ -184,12 +184,12 @@ export const RegisterPage: React.FC = () => {
 
         {referral && (
           <div className="rounded-xl border border-brand-500/30 bg-brand-500/10 px-4 py-2.5 text-xs text-brand-500">
-            Bạn đang đăng ký qua link giới thiệu <strong className="font-mono">{referral}</strong>.
+            You are signing up through referral link <strong className="font-mono">{referral}</strong>.
           </div>
         )}
 
-        <Field label="Họ và tên">
-          <input type="text" className={inputClass} value={form.fullName} onChange={update('fullName')} placeholder="Nguyễn Văn A" />
+        <Field label="Full name">
+          <input type="text" className={inputClass} value={form.fullName} onChange={update('fullName')} placeholder="Jane Doe" />
         </Field>
 
         <Field label="Email">
@@ -204,20 +204,20 @@ export const RegisterPage: React.FC = () => {
           />
         </Field>
 
-        <Field label="Số điện thoại">
-          <input type="tel" className={inputClass} value={form.phone} onChange={update('phone')} placeholder="0900000000" />
+        <Field label="Phone number">
+          <input type="tel" className={inputClass} value={form.phone} onChange={update('phone')} placeholder="+1 555 000 0000" />
         </Field>
 
-        <Field label="Mật khẩu" hint="Tối thiểu 6 ký tự.">
+        <Field label="Password" hint="At least 6 characters.">
           <PasswordInput value={form.password} onChange={update('password')} autoComplete="new-password" required />
         </Field>
 
-        <Field label="Nhập lại mật khẩu">
+        <Field label="Confirm password">
           <PasswordInput value={form.confirm} onChange={update('confirm')} autoComplete="new-password" required />
         </Field>
 
         <Button type="submit" isLoading={isSubmitting} className="w-full !rounded-xl">
-          Đăng ký
+          Create account
         </Button>
       </form>
     </AuthShell>

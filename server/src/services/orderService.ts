@@ -10,7 +10,7 @@ export interface PackageRow extends RowDataPacket {
   id: number;
   code: string;
   name: string;
-  price_vnd: number;
+  price_usd_cents: number;
   base_tokens: number;
   bonus_tokens: number;
   description: string | null;
@@ -29,17 +29,19 @@ export interface OrderRow extends RowDataPacket {
   package_id: number | null;
   package_code: string | null;
   package_name: string;
-  amount_vnd: number;
-  credit_vnd: number;
+  amount_usd_cents: number;
+  credit_usd_cents: number;
   is_upgrade: number;
   base_tokens: number;
   bonus_tokens: number;
   total_tokens: number;
   status: 'pending' | 'paid' | 'cancelled' | 'expired';
   payment_method: string;
+  stripe_session_id: string | null;
+  stripe_payment_intent: string | null;
   paid_source: string | null;
   payment_ref: string | null;
-  paid_amount_vnd: number | null;
+  paid_amount_usd_cents: number | null;
   paid_at: Date | null;
   fulfilled_at: Date | null;
   approved_by: number | null;
@@ -48,7 +50,12 @@ export interface OrderRow extends RowDataPacket {
   created_at: Date;
 }
 
-/** Bỏ các ký tự dễ nhìn nhầm (0/O, 1/I) để khách gõ nội dung chuyển khoản không sai. */
+/**
+ * Bỏ các ký tự dễ nhìn nhầm (0/O, 1/I).
+ *
+ * Mã đơn không còn phải gõ tay vào nội dung chuyển khoản, nhưng khách vẫn đọc nó
+ * qua điện thoại khi liên hệ hỗ trợ nên vẫn đáng để tránh ký tự dễ nhầm.
+ */
 const CODE_ALPHABET = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
 
 function randomCode(): string {
@@ -58,78 +65,31 @@ function randomCode(): string {
   return `${env.orderPrefix}${out}`;
 }
 
-/**
- * Dò tất cả mã đơn có thể có trong nội dung chuyển khoản.
- *
- * Ngân hàng hay chèn dấu cách và ký tự lạ nên phải bỏ hết ký tự không phải
- * chữ-số trước khi dò. Hệ quả: chữ đứng ngay sau mã có thể bị hút vào và tạo ra
- * một mã "trông đúng nhưng sai" (vd "NAP7K3Q2 thieu" → NAP7K3Q2T). Vì vậy hàm
- * này trả về danh sách ứng viên, còn `resolveOrderCode` mới là nơi quyết định —
- * chỉ mã thật sự tồn tại trong DB mới được dùng.
- */
-export function extractOrderCodes(content: string): string[] {
-  const normalized = content.toUpperCase().replace(/[^A-Z0-9]/g, '');
-  const pattern = new RegExp(`${env.orderPrefix}[${CODE_ALPHABET}]{6}`, 'g');
-  return [...new Set(normalized.match(pattern) ?? [])];
-}
-
-/**
- * Chọn ra mã đơn thật trong số các ứng viên.
- * Ưu tiên đơn đang chờ thanh toán; nếu không có thì lấy đơn bất kỳ đang tồn tại
- * (để webhook ghi nhận được là "đơn này đã thanh toán rồi" thay vì "không khớp").
- */
-export async function resolveOrderCode(candidates: string[]): Promise<string | null> {
-  if (candidates.length === 0) return null;
-
-  const placeholders = candidates.map(() => '?').join(',');
-  const rows = await query<RowDataPacket & { code: string; status: OrderRow['status'] }>(
-    `SELECT code, status FROM orders WHERE code IN (${placeholders})
-      ORDER BY (status = 'pending') DESC, (status = 'expired') DESC, id DESC LIMIT 1`,
-    candidates,
-  );
-  return rows[0]?.code ?? null;
-}
-
-/** Link ảnh QR VietQR đã điền sẵn số tiền và nội dung chuyển khoản. */
-export function buildVietQrUrl(order: Pick<OrderRow, 'code' | 'amount_vnd'>): string | null {
-  if (!env.bank.code || !env.bank.accountNumber) return null;
-
-  const params = new URLSearchParams({
-    amount: String(order.amount_vnd),
-    addInfo: order.code,
-    accountName: env.bank.accountName,
-  });
-  return `https://img.vietqr.io/image/${env.bank.code}-${env.bank.accountNumber}-compact2.png?${params.toString()}`;
-}
-
-export const bankInfo = () => ({
-  bankCode: env.bank.code,
-  bankName: env.bank.bankName || env.bank.code,
-  accountNumber: env.bank.accountNumber,
-  accountName: env.bank.accountName,
-  configured: Boolean(env.bank.accountNumber),
-});
-
 export async function listActivePackages(): Promise<PackageRow[]> {
-  return query<PackageRow>('SELECT * FROM token_packages WHERE is_active = 1 ORDER BY sort_order, price_vnd');
+  return query<PackageRow>('SELECT * FROM token_packages WHERE is_active = 1 ORDER BY sort_order, price_usd_cents');
 }
 
 /**
- * Tạo đơn mua điểm ở trạng thái chờ chuyển khoản.
+ * Tạo đơn mua điểm ở trạng thái chờ thanh toán.
+ *
+ * Đơn được ghi TRƯỚC khi mở phiên Stripe Checkout, không phải sau: phiên Stripe
+ * mang `client_reference_id` là mã đơn, nên đơn phải tồn tại trước thì webhook
+ * quay về mới có chỗ để khớp. Ngược lại — tạo phiên trước rồi mới ghi đơn — thì
+ * khách thanh toán trong lúc server chết là mất trắng giao dịch.
  *
  * Đây là loại đơn DUY NHẤT khách còn tạo được — gói tháng đã ngừng bán. Đơn
  * `subscription` chỉ còn tồn tại ở dạng dữ liệu cũ; xem `fulfillOrder`.
  */
 export async function createOrder(userId: number, packageId: number): Promise<OrderRow> {
   const pkg = await queryOne<PackageRow>('SELECT * FROM token_packages WHERE id = ? AND is_active = 1', [packageId]);
-  if (!pkg) throw badRequest('Gói điểm không tồn tại hoặc đã ngừng bán.');
+  if (!pkg) throw badRequest('This credit pack no longer exists or is not on sale.');
 
   const pending = await queryOne<RowDataPacket & { total: number }>(
     `SELECT COUNT(*) AS total FROM orders WHERE user_id = ? AND status = 'pending'`,
     [userId],
   );
   if ((pending?.total ?? 0) >= 5) {
-    throw conflict('Bạn đang có quá nhiều đơn chờ thanh toán. Vui lòng hoàn tất hoặc huỷ bớt.', 'too_many_pending');
+    throw conflict('You have too many unpaid orders. Please complete or cancel some of them first.', 'too_many_pending');
   }
 
   // Rất khó trùng, nhưng vẫn thử lại vài lần cho chắc.
@@ -138,16 +98,16 @@ export async function createOrder(userId: number, packageId: number): Promise<Or
     try {
       const result = await execute(
         `INSERT INTO orders
-           (code, user_id, order_type, package_id, package_code,
-            package_name, amount_vnd, base_tokens, bonus_tokens, total_tokens, expires_at)
-         VALUES (?, ?, 'token_package', ?, ?, ?, ?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL ? MINUTE))`,
+           (code, user_id, order_type, package_id, package_code, package_name,
+            amount_usd_cents, base_tokens, bonus_tokens, total_tokens, payment_method, expires_at)
+         VALUES (?, ?, 'token_package', ?, ?, ?, ?, ?, ?, ?, 'stripe', DATE_ADD(NOW(), INTERVAL ? MINUTE))`,
         [
           code,
           userId,
           pkg.id,
           pkg.code,
           pkg.name,
-          pkg.price_vnd,
+          pkg.price_usd_cents,
           pkg.base_tokens,
           pkg.bonus_tokens,
           pkg.base_tokens + pkg.bonus_tokens,
@@ -155,7 +115,7 @@ export async function createOrder(userId: number, packageId: number): Promise<Or
         ],
       );
       const order = await queryOne<OrderRow>('SELECT * FROM orders WHERE id = ?', [result.insertId]);
-      if (!order) throw new Error('Tạo đơn thất bại.');
+      if (!order) throw new Error('Không tạo được đơn.');
       return order;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -167,10 +127,10 @@ export async function createOrder(userId: number, packageId: number): Promise<Or
 }
 
 export interface MarkPaidInput {
-  /** sepay | casso | manual */
+  /** stripe | manual | external */
   source: string;
   paymentRef?: string | null;
-  paidAmountVnd?: number | null;
+  paidAmountUsdCents?: number | null;
   approvedBy?: number | null;
   note?: string | null;
 }
@@ -206,20 +166,21 @@ export async function markOrderPaid(orderCode: string, input: MarkPaidInput): Pr
       };
     }
 
-    // Chuyển thiếu tiền thì không tự cộng điểm — để admin xử lý tay.
-    const paidAmount = input.paidAmountVnd ?? order.amount_vnd;
-    if (input.source !== 'manual' && paidAmount < order.amount_vnd) {
+    // Thu thiếu tiền thì không tự cộng điểm — để admin xử lý tay.
+    const paidAmount = input.paidAmountUsdCents ?? order.amount_usd_cents;
+    if (input.source !== 'manual' && paidAmount < order.amount_usd_cents) {
+      const usd = (cents: number) => `$${(cents / 100).toFixed(2)}`;
       return {
         ok: false,
         reason: 'amount_mismatch',
         order,
-        message: `Số tiền nhận được (${paidAmount.toLocaleString('vi-VN')}đ) nhỏ hơn giá trị đơn (${order.amount_vnd.toLocaleString('vi-VN')}đ).`,
+        message: `Số tiền nhận được (${usd(paidAmount)}) nhỏ hơn giá trị đơn (${usd(order.amount_usd_cents)}).`,
       };
     }
 
     await conn.query(
       `UPDATE orders
-          SET status = 'paid', paid_source = ?, payment_ref = ?, paid_amount_vnd = ?,
+          SET status = 'paid', paid_source = ?, payment_ref = ?, paid_amount_usd_cents = ?,
               paid_at = NOW(), approved_by = ?, note = COALESCE(?, note)
         WHERE id = ?`,
       [input.source, input.paymentRef ?? null, paidAmount, input.approvedBy ?? null, input.note ?? null, order.id],
@@ -269,14 +230,14 @@ async function fulfillOrder(
         /*
          * GIÁ NIÊM YẾT của gói, không phải số tiền khách trả.
          *
-         * Với đơn nâng gói, amount_vnd đã bị trừ phần khấu trừ. Lưu số đã trừ vào
-         * thuê bao sẽ làm hỏng hai thứ ở lần nâng sau: khách bị tính khấu trừ trên
-         * giá thấp hơn thực tế, và gói cao nhất vẫn hiện ra như một lựa chọn để
-         * "nâng lên chính nó" vì giá niêm yết luôn lớn hơn số đã trả.
+         * Với đơn nâng gói, amount_usd_cents đã bị trừ phần khấu trừ. Lưu số đã trừ
+         * vào thuê bao sẽ làm hỏng hai thứ ở lần nâng sau: khách bị tính khấu trừ
+         * trên giá thấp hơn thực tế, và gói cao nhất vẫn hiện ra như một lựa chọn
+         * để "nâng lên chính nó" vì giá niêm yết luôn lớn hơn số đã trả.
          *
-         * amount_vnd + credit_vnd = giá niêm yết (credit_vnd = 0 với đơn thường).
+         * amount + credit = giá niêm yết (credit = 0 với đơn thường).
          */
-        priceVnd: order.amount_vnd + order.credit_vnd,
+        priceUsdCents: order.amount_usd_cents + order.credit_usd_cents,
         // Gói bị xoá khỏi bảng giá thì vẫn dùng được hạn mức mặc định 500.000.
         allowance: plan?.monthly_token_allowance ?? 500_000,
       },
@@ -292,13 +253,13 @@ async function fulfillOrder(
       type: 'topup',
       refType: 'order',
       refId: order.id,
-      description: `Mua thêm điểm · gói ${order.package_name} · đơn ${order.code}`,
+      description: `Credit purchase · ${order.package_name} · order ${order.code}`,
       createdBy: approvedBy,
     });
   }
 
-  await conn.query('UPDATE users SET total_topup_vnd = total_topup_vnd + ? WHERE id = ?', [
-    order.amount_vnd,
+  await conn.query('UPDATE users SET total_topup_usd_cents = total_topup_usd_cents + ? WHERE id = ?', [
+    order.amount_usd_cents,
     order.user_id,
   ]);
 
@@ -357,7 +318,7 @@ export async function fulfillPaidOrders(): Promise<number> {
             `UPDATE orders
                 SET paid_at = COALESCE(paid_at, NOW()),
                     paid_source = COALESCE(paid_source, 'external'),
-                    paid_amount_vnd = COALESCE(paid_amount_vnd, amount_vnd)
+                    paid_amount_usd_cents = COALESCE(paid_amount_usd_cents, amount_usd_cents)
               WHERE id = ?`,
             [order.id],
           );
@@ -382,12 +343,16 @@ export async function fulfillPaidOrders(): Promise<number> {
   }
 }
 
-export async function cancelOrder(userId: number, orderId: number): Promise<void> {
+export async function cancelOrder(userId: number, orderId: number): Promise<OrderRow> {
   const result = await execute(`UPDATE orders SET status = 'cancelled' WHERE id = ? AND user_id = ? AND status = 'pending'`, [
     orderId,
     userId,
   ]);
-  if (result.affectedRows === 0) throw badRequest('Chỉ huỷ được đơn đang chờ thanh toán.');
+  if (result.affectedRows === 0) throw badRequest('Only orders awaiting payment can be cancelled.');
+
+  const order = await queryOne<OrderRow>('SELECT * FROM orders WHERE id = ?', [orderId]);
+  if (!order) throw notFound('Order not found.');
+  return order;
 }
 
 /** Đánh dấu hết hạn cho các đơn quá thời gian mà chưa thanh toán. */
@@ -405,21 +370,19 @@ export function serializeOrder(order: OrderRow) {
     orderType: order.order_type,
     subscriptionMonths: order.subscription_months,
     isUpgrade: Boolean(order.is_upgrade),
-    creditVnd: order.credit_vnd,
+    creditUsdCents: order.credit_usd_cents,
     packageName: order.package_name,
-    amountVnd: order.amount_vnd,
+    amountUsdCents: order.amount_usd_cents,
     baseTokens: order.base_tokens,
     bonusTokens: order.bonus_tokens,
     totalTokens: order.total_tokens,
     status: order.status,
+    paymentMethod: order.payment_method,
     paidSource: order.paid_source,
     paymentRef: order.payment_ref,
     paidAt: order.paid_at,
     expiresAt: order.expires_at,
     createdAt: order.created_at,
     note: order.note,
-    // Đơn quá hạn vẫn giữ mã QR: khách chuyển muộn thì webhook vẫn cộng điểm được.
-    qrUrl: order.status === 'pending' || order.status === 'expired' ? buildVietQrUrl(order) : null,
-    transferContent: order.code,
   };
 }

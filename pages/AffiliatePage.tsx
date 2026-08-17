@@ -2,15 +2,15 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Alert, Card, EmptyState, PageLoader, StatCard, TableWrap } from '../components/ui';
 import { api, qs } from '../lib/api';
 import { copyText } from '../lib/clipboard';
-import { formatDateTime, formatNumber, formatVnd } from '../lib/format';
+import { formatDateTime, formatNumber, formatUsd } from '../lib/format';
 import type { AffiliateCommission, AffiliateReferral, AffiliateSummary } from '../types';
 
 const PAGE_SIZE = 25;
 
 const STATUS_LABEL: Record<string, string> = {
-  pending: 'Chờ chi trả',
-  paid: 'Đã trả',
-  cancelled: 'Đã huỷ',
+  pending: 'Pending payout',
+  paid: 'Paid',
+  cancelled: 'Cancelled',
 };
 
 const STATUS_CLASS: Record<string, string> = {
@@ -48,14 +48,14 @@ const ReferralLinkBox: React.FC<{ link: string }> = ({ link }) => {
           onClick={copy}
           className="bg-brand-500 hover:bg-brand-600 text-white text-sm font-bold rounded-xl px-5 py-2.5 transition-colors whitespace-nowrap"
         >
-          {state === 'copied' ? '✓ Đã sao chép' : 'Sao chép link'}
+          {state === 'copied' ? '✓ Copied' : 'Copy link'}
         </button>
       </div>
 
       {state === 'failed' && (
         <p className="text-[11px] text-amber-400">
-          Trình duyệt không cho sao chép tự động. Link đã được bôi đen sẵn — bấm <strong>Ctrl+C</strong> (hoặc{' '}
-          <strong>⌘+C</strong>) để chép.
+          Your browser blocked automatic copying. The link is already selected — press <strong>Ctrl+C</strong> (or{' '}
+          <strong>⌘+C</strong>) to copy it.
         </p>
       )}
     </div>
@@ -109,75 +109,75 @@ export const AffiliatePage: React.FC = () => {
   return (
     <div className="max-w-5xl mx-auto p-6 space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-100">Tiếp thị liên kết</h1>
+        <h1 className="text-2xl font-bold text-gray-100">Affiliate program</h1>
         <p className="text-sm text-gray-500 mt-1">
-          Chia sẻ link của bạn. Mỗi khách đăng ký từ link đó sẽ mang lại hoa hồng cho bạn trên mọi đơn họ mua.
+          Share your link. Every customer who signs up through it earns you commission on every order they place.
         </p>
       </div>
 
       {!summary.enabled && (
         <Alert tone="warning">
-          Chương trình tiếp thị liên kết đang <strong>tạm dừng</strong>. Các khoản đã ghi nhận vẫn được giữ nguyên và chi
-          trả bình thường, nhưng đơn mới trong thời gian này chưa tính hoa hồng.
+          The affiliate program is currently <strong>paused</strong>. Commission already recorded is kept and will still
+          be paid out, but new orders during this period do not earn commission.
         </Alert>
       )}
 
       {!summary.isAffiliate && (
         <Alert tone="info">
-          Bạn đang xem trang này với quyền quản trị viên. Tài khoản của bạn chưa được cấp vai trò cộng tác viên nên chưa
-          có link giới thiệu riêng.
+          You are viewing this page as an administrator. Your own account has not been given the affiliate role, so it
+          has no referral link yet.
         </Alert>
       )}
 
       {summary.referralLink && (
         <Card className="p-5 space-y-3">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <h2 className="font-bold text-gray-100">Link giới thiệu của bạn</h2>
+            <h2 className="font-bold text-gray-100">Your referral link</h2>
             <span className="text-[11px] text-gray-500">
-              Mã: <strong className="text-gray-300 font-mono">{summary.code}</strong>
+              Code: <strong className="text-gray-300 font-mono">{summary.code}</strong>
             </span>
           </div>
           <ReferralLinkBox link={summary.referralLink} />
           <p className="text-[11px] text-gray-600">
-            Khách bấm vào link sẽ được ghi nhớ trong <strong className="text-gray-500">60 ngày</strong> — họ không cần
-            đăng ký ngay lúc đó. Hoa hồng chỉ tính cho tài khoản <strong className="text-gray-500">đăng ký mới</strong>{' '}
-            từ link, không áp dụng cho khách đã có tài khoản từ trước.
+            Anyone who clicks your link is remembered for <strong className="text-gray-500">60 days</strong> — they do
+            not have to sign up right away. Commission applies only to{' '}
+            <strong className="text-gray-500">new accounts</strong> created through the link, not to existing customers.
           </p>
         </Card>
       )}
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
-          label="Chờ chi trả"
-          value={formatVnd(stats.pendingVnd)}
-          sub="sẽ được thanh toán theo kỳ"
-          tone={stats.pendingVnd > 0 ? 'positive' : 'default'}
+          label="Pending payout"
+          value={formatUsd(stats.pendingUsdCents)}
+          sub="paid out on the next cycle"
+          tone={stats.pendingUsdCents > 0 ? 'positive' : 'default'}
         />
-        <StatCard label="Đã nhận" value={formatVnd(stats.paidVnd)} sub="tổng đã chi trả" />
+        <StatCard label="Paid out" value={formatUsd(stats.paidUsdCents)} sub="total received so far" />
         <StatCard
-          label="Khách đã giới thiệu"
+          label="Referred customers"
           value={formatNumber(stats.referrals)}
-          sub={`${formatNumber(stats.payingReferrals)} người đã phát sinh đơn`}
+          sub={`${formatNumber(stats.payingReferrals)} have placed an order`}
         />
         <StatCard
-          label="Doanh thu mang về"
-          value={formatVnd(stats.revenueVnd)}
-          sub={`${formatNumber(stats.orders)} đơn đã thanh toán`}
+          label="Revenue generated"
+          value={formatUsd(stats.revenueUsdCents)}
+          sub={`${formatNumber(stats.orders)} paid orders`}
         />
       </div>
 
       <Alert tone="info">
-        Hoa hồng bằng <strong>{summary.commissionPercent}% lợi nhuận</strong> của mỗi đơn, trong đó lợi nhuận = số tiền
-        khách trả trừ đi giá vốn số điểm đã bán và các chi phí cố định. Toàn bộ cách tính của từng đơn được ghi rõ trong
-        bảng bên dưới.
+        You earn <strong>{summary.commissionPercent}% of the profit</strong> on each order, where profit is what the
+        customer paid minus the provider cost of the credits sold and fixed costs. The full breakdown for every order is
+        in the table below.
       </Alert>
 
       <Card className="p-4">
         <div className="flex gap-1 border-b border-dark-800 mb-3">
           {(
             [
-              ['commissions', 'Hoa hồng theo đơn'],
-              ['referrals', 'Khách đã giới thiệu'],
+              ['commissions', 'Commission by order'],
+              ['referrals', 'Referred customers'],
             ] as const
           ).map(([key, label]) => (
             <button
@@ -195,20 +195,20 @@ export const AffiliatePage: React.FC = () => {
         {tab === 'commissions' ? (
           commissions.length === 0 ? (
             <EmptyState
-              title="Chưa có khoản hoa hồng nào."
-              hint="Hoa hồng xuất hiện ở đây ngay khi khách bạn giới thiệu thanh toán đơn đầu tiên."
+              title="No commission yet."
+              hint="Commission shows up here as soon as a referred customer pays their first order."
             />
           ) : (
             <TableWrap>
               <thead>
                 <tr className="text-[11px] uppercase tracking-wider text-gray-500 border-b border-dark-800">
-                  <th className="text-left font-bold py-2">Thời gian</th>
-                  <th className="text-left font-bold py-2">Khách</th>
-                  <th className="text-left font-bold py-2">Đơn</th>
-                  <th className="text-right font-bold py-2">Doanh thu</th>
-                  <th className="text-right font-bold py-2">Lợi nhuận</th>
-                  <th className="text-right font-bold py-2">Hoa hồng</th>
-                  <th className="text-left font-bold py-2 pl-4">Trạng thái</th>
+                  <th className="text-left font-bold py-2">Date</th>
+                  <th className="text-left font-bold py-2">Customer</th>
+                  <th className="text-left font-bold py-2">Order</th>
+                  <th className="text-right font-bold py-2">Revenue</th>
+                  <th className="text-right font-bold py-2">Profit</th>
+                  <th className="text-right font-bold py-2">Commission</th>
+                  <th className="text-left font-bold py-2 pl-4">Status</th>
                 </tr>
               </thead>
               <tbody>
@@ -217,18 +217,18 @@ export const AffiliatePage: React.FC = () => {
                     <td className="py-2.5 text-xs text-gray-500 whitespace-nowrap">{formatDateTime(row.createdAt)}</td>
                     <td className="py-2.5 text-xs text-gray-400">{row.customer}</td>
                     <td className="py-2.5 text-xs text-gray-500 font-mono">{row.orderCode}</td>
-                    <td className="py-2.5 text-right text-gray-300">{formatVnd(row.revenueVnd)}</td>
+                    <td className="py-2.5 text-right text-gray-300">{formatUsd(row.revenueUsdCents)}</td>
                     <td
                       className="py-2.5 text-right text-gray-400"
                       title={
-                        `Doanh thu ${formatVnd(row.revenueVnd)} − giá vốn điểm ${formatVnd(row.tokenCostVnd)}` +
-                        (row.fixedCostVnd > 0 ? ` − chi phí cố định ${formatVnd(row.fixedCostVnd)}` : '')
+                        `Revenue ${formatUsd(row.revenueUsdCents)} − credit cost ${formatUsd(row.tokenCostUsdCents)}` +
+                        (row.fixedCostUsdCents > 0 ? ` − fixed costs ${formatUsd(row.fixedCostUsdCents)}` : '')
                       }
                     >
-                      {formatVnd(row.profitVnd)}
+                      {formatUsd(row.profitUsdCents)}
                     </td>
                     <td className="py-2.5 text-right font-semibold text-brand-500">
-                      {formatVnd(row.commissionVnd)}
+                      {formatUsd(row.commissionUsdCents)}
                       <span className="text-[10px] text-gray-600 font-normal"> · {row.commissionPercent}%</span>
                     </td>
                     <td className="py-2.5 pl-4">
@@ -249,15 +249,15 @@ export const AffiliatePage: React.FC = () => {
             </TableWrap>
           )
         ) : referrals.length === 0 ? (
-          <EmptyState title="Chưa có ai đăng ký từ link của bạn." hint="Chia sẻ link ở phần trên để bắt đầu." />
+          <EmptyState title="Nobody has signed up through your link yet." hint="Share the link above to get started." />
         ) : (
           <TableWrap>
             <thead>
               <tr className="text-[11px] uppercase tracking-wider text-gray-500 border-b border-dark-800">
-                <th className="text-left font-bold py-2">Khách</th>
-                <th className="text-left font-bold py-2">Đăng ký lúc</th>
-                <th className="text-right font-bold py-2">Đã chi tiêu</th>
-                <th className="text-right font-bold py-2">Hoa hồng của bạn</th>
+                <th className="text-left font-bold py-2">Customer</th>
+                <th className="text-left font-bold py-2">Joined</th>
+                <th className="text-right font-bold py-2">Spent</th>
+                <th className="text-right font-bold py-2">Your commission</th>
               </tr>
             </thead>
             <tbody>
@@ -265,8 +265,8 @@ export const AffiliatePage: React.FC = () => {
                 <tr key={row.id} className="border-b border-dark-850 last:border-0">
                   <td className="py-2.5 text-xs text-gray-400">{row.customer}</td>
                   <td className="py-2.5 text-xs text-gray-500 whitespace-nowrap">{formatDateTime(row.joinedAt)}</td>
-                  <td className="py-2.5 text-right text-gray-300">{formatVnd(row.revenueVnd)}</td>
-                  <td className="py-2.5 text-right font-semibold text-brand-500">{formatVnd(row.commissionVnd)}</td>
+                  <td className="py-2.5 text-right text-gray-300">{formatUsd(row.revenueUsdCents)}</td>
+                  <td className="py-2.5 text-right font-semibold text-brand-500">{formatUsd(row.commissionUsdCents)}</td>
                 </tr>
               ))}
             </tbody>
@@ -280,17 +280,17 @@ export const AffiliatePage: React.FC = () => {
               disabled={page === 1}
               className="px-3 py-1.5 rounded-lg bg-dark-850 text-gray-300 text-sm disabled:opacity-30"
             >
-              ← Trước
+              ← Previous
             </button>
             <span className="text-sm text-gray-500">
-              Trang {page} / {totalPages}
+              Page {page} of {totalPages}
             </span>
             <button
               onClick={() => setPage((p) => Math.min(p + 1, totalPages))}
               disabled={page >= totalPages}
               className="px-3 py-1.5 rounded-lg bg-dark-850 text-gray-300 text-sm disabled:opacity-30"
             >
-              Sau →
+              Next →
             </button>
           </div>
         )}

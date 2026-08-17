@@ -17,10 +17,10 @@ export class AppError extends Error {
 
 export const badRequest = (message: string, code = 'bad_request', details?: unknown) =>
   new AppError(400, message, code, details);
-export const unauthorized = (message = 'Bạn cần đăng nhập.') => new AppError(401, message, 'unauthorized');
-export const forbidden = (message = 'Bạn không có quyền thực hiện thao tác này.') =>
+export const unauthorized = (message = 'Please sign in to continue.') => new AppError(401, message, 'unauthorized');
+export const forbidden = (message = 'You do not have permission to do that.') =>
   new AppError(403, message, 'forbidden');
-export const notFound = (message = 'Không tìm thấy dữ liệu.') => new AppError(404, message, 'not_found');
+export const notFound = (message = 'Not found.') => new AppError(404, message, 'not_found');
 export const conflict = (message: string, code = 'conflict') => new AppError(409, message, code);
 
 /** Bọc handler async để lỗi được đẩy về error middleware thay vì làm treo request. */
@@ -40,10 +40,10 @@ export function errorHandler(err: unknown, _req: Request, res: Response, _next: 
 
   // Lỗi hay gặp từ MySQL — dịch sang thông điệp dễ hiểu.
   if (message.includes('ER_DUP_ENTRY')) {
-    res.status(409).json({ error: 'Dữ liệu đã tồn tại.', code: 'duplicate' });
+    res.status(409).json({ error: 'That record already exists.', code: 'duplicate' });
     return;
   }
 
   console.error('[lỗi không mong đợi]', err);
-  res.status(500).json({ error: 'Lỗi hệ thống. Vui lòng thử lại.', code: 'internal_error' });
+  res.status(500).json({ error: 'Something went wrong on our side. Please try again.', code: 'internal_error' });
 }

@@ -90,7 +90,22 @@ export const env = {
     uploadUrl: str('KIE_UPLOAD_URL', 'https://kieai.redpandaai.co/api/file-base64-upload'),
   },
 
-  usdToVnd: num('USD_TO_VND', 28000),
+  /**
+   * QUY ƯỚC ĐƠN VỊ ĐIỂM: **10.000 điểm = 1 USD giá vốn nhà cung cấp**
+   * (tức 1 điểm = $0,0001 = 0,01 cent).
+   *
+   * Đây là hằng số neo toàn hệ thống, mọi con số khác suy ra từ nó:
+   *
+   *     token_cost (điểm/ảnh) = api_cost_usd × CREDITS_PER_USD
+   *     giá vốn của N điểm    = N / CREDITS_PER_USD  (USD)
+   *
+   * Nhờ vậy gói bán gấp đôi giá vốn chỉ đơn giản là "$1 mua được 5.000 điểm".
+   *
+   * ĐỪNG đổi giá trị này trên hệ thống đang chạy: nó định giá lại toàn bộ số dư
+   * điểm khách đang giữ và làm lệch mọi báo cáo lợi nhuận trong quá khứ. Muốn
+   * đổi biên lợi nhuận thì sửa giá gói trong Quản trị → Bảng giá.
+   */
+  creditsPerUsd: Math.max(num('CREDITS_PER_USD', 10_000), 1),
 
   /** Thông tin pháp lý & liên hệ, hiển thị ở trang Chính sách. */
   site: {
@@ -101,22 +116,29 @@ export const env = {
     policyUpdatedAt: str('POLICY_UPDATED_AT'),
   },
 
-  bank: {
-    code: str('BANK_CODE', 'MB'),
-    accountNumber: str('BANK_ACCOUNT_NUMBER', ''),
-    accountName: str('BANK_ACCOUNT_NAME', ''),
-    bankName: str('BANK_NAME', ''),
+  /**
+   * Stripe — cổng thanh toán duy nhất.
+   *
+   * `secretKey`  : sk_test_... khi thử, sk_live_... khi bán thật.
+   * `webhookSecret`: whsec_..., lấy khi tạo endpoint trong Stripe Dashboard
+   *                (hoặc do `stripe listen` in ra khi chạy thử ở máy cá nhân).
+   *                Thiếu nó thì server TỪ CHỐI mọi webhook — chữ ký không xác
+   *                minh được nghĩa là ai cũng có thể bắn request giả để tự cộng điểm.
+   */
+  stripe: {
+    secretKey: str('STRIPE_SECRET_KEY'),
+    webhookSecret: str('STRIPE_WEBHOOK_SECRET'),
+    /** Mã tiền tệ ISO gửi lên Stripe. Đổi thì phải đổi cả bảng giá cho khớp. */
+    currency: str('STRIPE_CURRENCY', 'usd').toLowerCase(),
   },
-  orderPrefix: str('ORDER_PREFIX', 'NAP').toUpperCase().replace(/[^A-Z]/g, '') || 'NAP',
+
+  orderPrefix: str('ORDER_PREFIX', 'ORD').toUpperCase().replace(/[^A-Z]/g, '') || 'ORD',
   orderExpireMinutes: num('ORDER_EXPIRE_MINUTES', 60),
   /**
    * Chu kỳ quét các đơn được hệ thống ngoài đánh dấu đã thanh toán (giây).
    * Càng nhỏ thì gói được kích hoạt càng nhanh sau khi workflow ghi vào DB.
    */
   orderSyncIntervalSeconds: Math.max(num('ORDER_SYNC_INTERVAL_SECONDS', 20), 5),
-
-  sepayApiKey: str('SEPAY_WEBHOOK_API_KEY'),
-  cassoSecureToken: str('CASSO_WEBHOOK_SECURE_TOKEN'),
 
   storageDir: path.isAbsolute(str('STORAGE_DIR', 'server/storage'))
     ? str('STORAGE_DIR', 'server/storage')
@@ -164,14 +186,21 @@ export function checkEnv(): void {
   if (env.adminEmails.length === 0) {
     warnings.push('ADMIN_EMAILS đang trống — sẽ không có ai vào được bảng điều khiển.');
   }
-  if (!env.bank.accountNumber) {
-    warnings.push('BANK_ACCOUNT_NUMBER chưa cấu hình — trang nạp tiền sẽ không hiện được mã QR.');
+  if (!env.stripe.secretKey) {
+    warnings.push('STRIPE_SECRET_KEY chưa cấu hình — khách sẽ không mua điểm được.');
+  }
+  if (!env.stripe.webhookSecret) {
+    warnings.push(
+      'STRIPE_WEBHOOK_SECRET chưa cấu hình — server sẽ TỪ CHỐI mọi webhook Stripe. ' +
+        'Đơn vẫn được cộng điểm nhờ vòng đối soát hỏi thẳng Stripe, nhưng chậm hơn; ' +
+        'hãy cấu hình webhook trước khi bán thật.',
+    );
+  }
+  if (env.stripe.secretKey.startsWith('sk_test_') && env.isProd) {
+    warnings.push('Đang chạy NODE_ENV=production nhưng STRIPE_SECRET_KEY là khoá test — sẽ không thu được tiền thật.');
   }
   if (!env.smtp.host || !env.smtp.user) {
     warnings.push('SMTP_HOST / SMTP_USER chưa cấu hình — chức năng quên mật khẩu sẽ không gửi được mail.');
-  }
-  if (!env.sepayApiKey && !env.cassoSecureToken) {
-    warnings.push('Chưa cấu hình SEPAY_WEBHOOK_API_KEY / CASSO_WEBHOOK_SECURE_TOKEN — đơn nạp phải duyệt tay trong trang Admin.');
   }
 
   for (const warning of warnings) {

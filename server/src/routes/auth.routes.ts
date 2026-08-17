@@ -77,7 +77,7 @@ authRouter.post(
   '/register',
   asyncHandler(async (req, res) => {
     const email = requireEmail(req.body);
-    const password = requireString(req.body, 'password', { label: 'Mật khẩu', min: 6, max: 100 });
+    const password = requireString(req.body, 'password', { label: 'Password', min: 6, max: 100 });
     const fullName = optionalString(req.body, 'fullName');
     const phone = optionalString(req.body, 'phone', 32);
     /*
@@ -90,7 +90,7 @@ authRouter.post(
     const referrerId = await resolveReferrer(optionalString(req.body, 'ref', 32));
 
     const existing = await queryOne<RowDataPacket & { id: number }>('SELECT id FROM users WHERE email = ?', [email]);
-    if (existing) throw conflict('Email này đã được đăng ký.', 'email_taken');
+    if (existing) throw conflict('An account with this email already exists.', 'email_taken');
 
     const role = isAdminEmail(email) ? 'admin' : 'user';
     const freeTokens = Number(
@@ -113,7 +113,7 @@ authRouter.post(
         userId: result.insertId,
         amount: Math.trunc(freeTokens),
         type: 'adjust',
-        description: 'Token tặng khi đăng ký tài khoản',
+        description: 'Welcome credits',
       });
     }
 
@@ -128,14 +128,14 @@ authRouter.post(
   '/login',
   asyncHandler(async (req, res) => {
     const email = requireEmail(req.body);
-    const password = requireString(req.body, 'password', { label: 'Mật khẩu' });
+    const password = requireString(req.body, 'password', { label: 'Password' });
 
     const row = await queryOne<AuthUser & { password_hash: string }>('SELECT * FROM users WHERE email = ?', [email]);
     // Thông điệp giống nhau cho cả hai trường hợp để không lộ email nào đã tồn tại.
     if (!row || !(await verifyPassword(password, row.password_hash))) {
-      throw unauthorized('Email hoặc mật khẩu không đúng.');
+      throw unauthorized('Incorrect email or password.');
     }
-    if (row.status === 'banned') throw forbidden('Tài khoản của bạn đã bị khoá.');
+    if (row.status === 'banned') throw forbidden('Your account has been suspended.');
 
     await execute('UPDATE users SET last_login_at = NOW() WHERE id = ?', [row.id]);
 
@@ -157,7 +157,7 @@ authRouter.post(
   '/forgot-password',
   asyncHandler(async (req, res) => {
     const identifier = requireString(req.body, 'identifier', {
-      label: 'Email hoặc số điện thoại',
+      label: 'Email or phone number',
       min: 3,
       max: 190,
     });
@@ -180,8 +180,8 @@ authRouter.get(
 authRouter.post(
   '/reset-password',
   asyncHandler(async (req, res) => {
-    const token = requireString(req.body, 'token', { label: 'Mã đặt lại mật khẩu', max: 190 });
-    const password = requireString(req.body, 'password', { label: 'Mật khẩu mới', min: 6, max: 100 });
+    const token = requireString(req.body, 'token', { label: 'Reset token', max: 190 });
+    const password = requireString(req.body, 'password', { label: 'New password', min: 6, max: 100 });
 
     await resetPassword(token, password);
 
@@ -223,15 +223,15 @@ authRouter.post(
   '/me/password',
   requireAuth,
   asyncHandler(async (req, res) => {
-    const currentPassword = requireString(req.body, 'currentPassword', { label: 'Mật khẩu hiện tại' });
-    const newPassword = requireString(req.body, 'newPassword', { label: 'Mật khẩu mới', min: 6, max: 100 });
+    const currentPassword = requireString(req.body, 'currentPassword', { label: 'Current password' });
+    const newPassword = requireString(req.body, 'newPassword', { label: 'New password', min: 6, max: 100 });
 
     const row = await queryOne<RowDataPacket & { password_hash: string }>(
       'SELECT password_hash FROM users WHERE id = ?',
       [req.user!.id],
     );
     if (!row || !(await verifyPassword(currentPassword, row.password_hash))) {
-      throw unauthorized('Mật khẩu hiện tại không đúng.');
+      throw unauthorized('Your current password is incorrect.');
     }
 
     await execute('UPDATE users SET password_hash = ? WHERE id = ?', [await hashPassword(newPassword), req.user!.id]);

@@ -1,40 +1,41 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { POLICY } from '../../lib/routes';
 import { Reveal } from './Reveal';
 import { SectionHeading } from './SectionHeading';
 
 const QUESTIONS = [
   {
-    q: 'Ảnh tạo ra có giống hệt ảnh mẫu không?',
-    a: 'Hệ thống học lại bố cục, ánh sáng và phong cách của ảnh mẫu rồi dựng lại với sản phẩm của bạn — nên giống về cách trình bày, không phải sao chép nguyên ảnh. Sản phẩm trong ảnh luôn là sản phẩm bạn tải lên.',
+    q: 'Will the result look exactly like the reference image?',
+    a: 'The system studies the reference layout, lighting and style, then rebuilds it around your product — so it matches the presentation, it does not copy the image. The product shown is always the one you uploaded.',
   },
   {
-    q: 'Tôi không biết dùng phần mềm thiết kế thì có làm được không?',
-    a: 'Được. Bạn chỉ cần tải hai ảnh lên và bấm tạo. Phần ghi chú thêm là tuỳ chọn, viết bằng tiếng Việt bình thường như đang nhờ người khác làm giúp.',
+    q: 'Do I need to know design software?',
+    a: 'No. Upload two images and press generate. The extra notes field is optional — write it in plain English, the way you would brief a person.',
   },
   {
-    q: 'Điểm là gì và tính thế nào?',
-    a: 'Điểm là đơn vị đo mức sử dụng: 1 điểm tương ứng 1đ chi phí gốc trả cho nhà cung cấp mô hình. Mỗi ảnh trừ một số điểm cố định theo model và độ phân giải, hiện rõ trước khi bạn bấm tạo.',
+    q: 'What are credits and how are they counted?',
+    a: 'Credits are the usage unit: 10,000 credits equal $1 of provider cost. Each image costs a fixed number of credits depending on the model and resolution, and the exact cost is shown before you press generate.',
   },
   {
-    q: 'Có phải đóng phí hàng tháng không?',
-    a: 'Không. Bạn chỉ mua điểm, mua xong là dùng được ngay — không có phí duy trì, không cam kết thời hạn, không tự động gia hạn. Hết điểm thì mua thêm, không mua cũng không mất gì.',
+    q: 'Is there a monthly fee?',
+    a: 'No. You buy credits and use them right away — no maintenance fee, no minimum term, no auto-renewal. When you run out, buy more; if you do not, nothing is lost.',
   },
   {
-    q: 'Điểm đã mua có hết hạn không?',
-    a: 'Không. Điểm nằm trong ví cho tới khi bạn dùng hết, dù bạn nghỉ vài tháng không tạo ảnh.',
+    q: 'Do purchased credits expire?',
+    a: 'No. They stay in your account until you spend them, even if you take a few months off.',
   },
   {
-    q: 'Ảnh bị lỗi thì có mất điểm không?',
-    a: 'Không. Khi nhà cung cấp trả về lỗi, hệ thống tự hoàn lại đúng số điểm đã trừ và ghi rõ trong sao kê ví. Bạn không phải liên hệ để đòi lại.',
+    q: 'Do I lose credits when an image fails?',
+    a: 'No. When the provider returns an error, the exact credits are refunded automatically and the refund is itemised in your ledger. You do not have to ask for it.',
   },
   {
-    q: 'Thanh toán bằng cách nào?',
-    a: 'Chuyển khoản ngân hàng theo mã QR hiện sẵn trên trang Mua điểm. Chuyển đúng số tiền và đúng nội dung thì hệ thống cộng điểm tự động, không cần gửi ảnh chụp biên lai.',
+    q: 'How do I pay?',
+    a: 'By card through Stripe. You are redirected to a secure Stripe checkout page, and credits land in your account the moment the payment clears. We never see your card number.',
   },
   {
-    q: 'Ảnh tạo ra tôi có được dùng để bán hàng không?',
-    a: 'Có. Bạn chịu trách nhiệm về ảnh mẫu và ảnh sản phẩm mình tải lên, và không dùng hệ thống để làm giả thương hiệu hay sản phẩm của người khác. Chi tiết nằm trong phần Nội dung & bản quyền của Chính sách.',
+    q: 'Can I use the generated images commercially?',
+    a: 'Yes. You are responsible for the reference and product images you upload, and you may not use the system to counterfeit another brand or product. Details are in the Content & ownership section of the Terms.',
   },
 ];
 
@@ -51,12 +52,12 @@ export const Faq: React.FC = () => {
   const [openIndex, setOpenIndex] = useState<number | null>(0);
 
   return (
-    <section id="cau-hoi" className="scroll-mt-20 py-14 sm:py-20 lg:py-28">
+    <section id="faq" className="scroll-mt-20 py-14 sm:py-20 lg:py-28">
       <div className="mx-auto max-w-[1280px] px-4 sm:px-6">
         <SectionHeading
-          eyebrow="Câu hỏi thường gặp"
-          title="Những thắc mắc hay gặp nhất"
-          description="Chưa thấy câu bạn cần? Đọc thêm ở trang Chính sách & Điều khoản, mọi con số nghiệp vụ đều ghi rõ ở đó."
+          eyebrow="FAQ"
+          title="The questions we hear most"
+          description="Not seeing yours? The Terms & Policies page spells out every business rule and number in detail."
         />
 
         <div className="mt-9 space-y-2.5 sm:mt-12">
@@ -109,8 +110,8 @@ export const Faq: React.FC = () => {
 
         <Reveal delay={100}>
           <p className="mt-8 text-center text-sm text-gray-500">
-            <Link to="/chinh-sach" className="font-semibold text-brand-500 underline-offset-2 hover:underline">
-              Xem toàn bộ Chính sách &amp; Điều khoản
+            <Link to={POLICY} className="font-semibold text-brand-500 underline-offset-2 hover:underline">
+              Read the full Terms &amp; Policies
             </Link>
           </p>
         </Reveal>

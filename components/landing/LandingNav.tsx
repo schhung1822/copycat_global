@@ -1,15 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { APP_HOME } from '../../lib/routes';
+import { APP_HOME, LOGIN, SIGNUP } from '../../lib/routes';
 import { ThemeToggle } from '../ThemeToggle';
 import { LandingLogo } from './LandingLogo';
 
 const NAV_LINKS = [
-  { href: '#quy-trinh', label: 'Quy trình' },
-  { href: '#tinh-nang', label: 'Tính năng' },
-  { href: '#model', label: 'Model AI' },
-  { href: '#bang-gia', label: 'Bảng giá' },
-  { href: '#cau-hoi', label: 'Câu hỏi' },
+  { href: '#how-it-works', label: 'How it works' },
+  { href: '#features', label: 'Features' },
+  { href: '#models', label: 'AI models' },
+  { href: '#pricing', label: 'Pricing' },
+  { href: '#faq', label: 'FAQ' },
 ];
 
 /**
@@ -82,30 +82,30 @@ export const LandingNav: React.FC<{ isLoggedIn: boolean }> = ({ isLoggedIn }) =>
               to={APP_HOME}
               className="whitespace-nowrap rounded-full bg-brand-500 px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-brand-600 sm:px-4 sm:text-sm"
             >
-              Vào tạo ảnh
+              Open the studio
             </Link>
           ) : (
             <>
               <Link
-                to="/dang-nhap"
+                to={LOGIN}
                 className="hidden rounded-full px-4 py-2 text-sm font-semibold text-gray-300 transition-colors hover:text-gray-100 sm:block"
               >
-                Đăng nhập
+                Sign in
               </Link>
               <Link
-                to="/dang-ky"
+                to={SIGNUP}
                 className="whitespace-nowrap rounded-full bg-brand-500 px-3 py-2 text-xs font-bold text-white shadow-lg shadow-brand-500/25 transition-all hover:bg-brand-600 hover:shadow-brand-500/40 sm:px-4 sm:text-sm"
               >
                 {/* Chữ ngắn trên mobile để thanh trên không bị đẩy tràn */}
-                <span className="sm:hidden">Dùng thử</span>
-                <span className="hidden sm:inline">Dùng thử ngay</span>
+                <span className="sm:hidden">Try it</span>
+                <span className="hidden sm:inline">Try it free</span>
               </Link>
             </>
           )}
 
           <button
             onClick={() => setIsMenuOpen((open) => !open)}
-            aria-label={isMenuOpen ? 'Đóng menu' : 'Mở menu'}
+            aria-label={isMenuOpen ? 'Close menu' : 'Open menu'}
             aria-expanded={isMenuOpen}
             className="flex h-9 w-9 items-center justify-center rounded-lg border border-dark-700 text-gray-300 transition-colors hover:bg-dark-850 lg:hidden"
           >
@@ -135,17 +135,17 @@ export const LandingNav: React.FC<{ isLoggedIn: boolean }> = ({ isLoggedIn }) =>
             ))}
             {!isLoggedIn && (
               <Link
-                to="/dang-nhap"
+                to={LOGIN}
                 onClick={() => setIsMenuOpen(false)}
                 className="rounded-lg px-3 py-3 text-sm font-medium text-gray-300 hover:bg-dark-850 hover:text-gray-100 sm:hidden"
               >
-                Đăng nhập
+                Sign in
               </Link>
             )}
 
             {/* Nút đổi sáng/tối bị ẩn ở thanh trên bản mobile nên đặt lại ở đây */}
             <div className="mt-2 flex items-center justify-between border-t border-dark-800 px-3 pt-4">
-              <span className="text-sm text-gray-500">Giao diện sáng / tối</span>
+              <span className="text-sm text-gray-500">Light / dark mode</span>
               <ThemeToggle />
             </div>
           </nav>

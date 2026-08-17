@@ -78,7 +78,7 @@ const escapeHtml = (value: string): string =>
  * cả Outlook lẫn Gmail.
  */
 export function buildPasswordResetMail(input: { name: string | null; link: string; minutes: number }): MailInput {
-  const greeting = input.name ? `Chào ${escapeHtml(input.name)},` : 'Chào bạn,';
+  const greeting = input.name ? `Hi ${escapeHtml(input.name)},` : 'Hi there,';
   const link = escapeHtml(input.link);
 
   const html = `
@@ -92,25 +92,25 @@ export function buildPasswordResetMail(input: { name: string | null; link: strin
       <tr><td style="padding:28px">
         <p style="margin:0 0 14px;font-size:15px;color:#1a1a18">${greeting}</p>
         <p style="margin:0 0 14px;font-size:15px;line-height:1.6;color:#3f3e3a">
-          Chúng tôi nhận được yêu cầu đặt lại mật khẩu cho tài khoản của bạn.
-          Bấm nút dưới đây để chọn mật khẩu mới.
+          We received a request to reset the password for your account.
+          Click the button below to choose a new one.
         </p>
 
         <p style="margin:24px 0">
           <a href="${link}" style="display:inline-block;background:#E60023;color:#ffffff;text-decoration:none;font-weight:bold;font-size:15px;padding:13px 28px;border-radius:999px">
-            Đặt lại mật khẩu
+            Reset password
           </a>
         </p>
 
         <p style="margin:0 0 14px;font-size:14px;line-height:1.6;color:#5c5b56">
-          Liên kết này chỉ dùng được <strong>một lần</strong> và sẽ hết hạn sau
-          <strong>${input.minutes} phút</strong>.
+          This link works <strong>once</strong> and expires in
+          <strong>${input.minutes} minutes</strong>.
         </p>
-        <p style="margin:0 0 6px;font-size:13px;color:#75736d">Nút không bấm được? Dán địa chỉ sau vào trình duyệt:</p>
+        <p style="margin:0 0 6px;font-size:13px;color:#75736d">Button not working? Paste this address into your browser:</p>
         <p style="margin:0 0 20px;font-size:12px;word-break:break-all"><a href="${link}" style="color:#E60023">${link}</a></p>
 
         <p style="margin:0;padding-top:18px;border-top:1px solid #ebebe9;font-size:13px;line-height:1.6;color:#75736d">
-          Nếu bạn không yêu cầu đổi mật khẩu, hãy bỏ qua email này — mật khẩu hiện tại của bạn vẫn giữ nguyên.
+          If you did not ask for a password reset, just ignore this email — your current password stays unchanged.
         </p>
       </td></tr>
     </table>
@@ -118,15 +118,15 @@ export function buildPasswordResetMail(input: { name: string | null; link: strin
 </table>`.trim();
 
   const text = [
-    input.name ? `Chào ${input.name},` : 'Chào bạn,',
+    input.name ? `Hi ${input.name},` : 'Hi there,',
     '',
-    'Chúng tôi nhận được yêu cầu đặt lại mật khẩu cho tài khoản của bạn.',
-    'Mở liên kết sau để chọn mật khẩu mới:',
+    'We received a request to reset the password for your account.',
+    'Open this link to choose a new one:',
     input.link,
     '',
-    `Liên kết chỉ dùng được một lần và hết hạn sau ${input.minutes} phút.`,
-    'Nếu bạn không yêu cầu đổi mật khẩu, hãy bỏ qua email này.',
+    `The link works once and expires in ${input.minutes} minutes.`,
+    'If you did not ask for a password reset, just ignore this email.',
   ].join('\n');
 
-  return { to: '', subject: 'Đặt lại mật khẩu Design Copycat AI', html, text };
+  return { to: '', subject: 'Reset your Design Copycat AI password', html, text };
 }

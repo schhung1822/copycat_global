@@ -4,7 +4,8 @@ import { ThemeToggle } from '../components/ThemeToggle';
 import { Alert, Card, PageLoader } from '../components/ui';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../lib/api';
-import { formatNumber, formatVnd } from '../lib/format';
+import { formatNumber, formatUsd } from '../lib/format';
+import { CREDITS, LOGIN } from '../lib/routes';
 import type { Catalog } from '../types';
 
 /**
@@ -27,18 +28,18 @@ const Section: React.FC<{ id: string; title: string; children: React.ReactNode }
 );
 
 const SECTIONS = [
-  { id: 'dich-vu', label: 'Về dịch vụ' },
-  { id: 'tai-khoan', label: 'Tài khoản' },
-  { id: 'goi-cuoc', label: 'Điểm và cách tính' },
-  { id: 'diem-le', label: 'Mua điểm' },
-  { id: 'thanh-toan', label: 'Thanh toán' },
-  { id: 'hoan-tra', label: 'Hoàn điểm & hoàn tiền' },
-  { id: 'noi-dung', label: 'Nội dung & bản quyền' },
-  { id: 'cam', label: 'Hành vi bị cấm' },
-  { id: 'du-lieu', label: 'Dữ liệu & bảo mật' },
-  { id: 'trach-nhiem', label: 'Giới hạn trách nhiệm' },
-  { id: 'thay-doi', label: 'Thay đổi điều khoản' },
-  { id: 'lien-he', label: 'Liên hệ' },
+  { id: 'service', label: 'The service' },
+  { id: 'accounts', label: 'Accounts' },
+  { id: 'credits', label: 'Credits' },
+  { id: 'buying', label: 'Buying credits' },
+  { id: 'payments', label: 'Payments' },
+  { id: 'refunds', label: 'Refunds' },
+  { id: 'content', label: 'Content & ownership' },
+  { id: 'prohibited', label: 'Prohibited use' },
+  { id: 'data', label: 'Data & privacy' },
+  { id: 'liability', label: 'Limitation of liability' },
+  { id: 'changes', label: 'Changes to these terms' },
+  { id: 'contact', label: 'Contact' },
 ];
 
 export const PolicyPage: React.FC = () => {
@@ -48,7 +49,10 @@ export const PolicyPage: React.FC = () => {
   const [activeId, setActiveId] = useState<string>(SECTIONS[0].id);
 
   useEffect(() => {
-    void api.get<Catalog>('/catalog').then(setCatalog).catch(() => setCatalog(null));
+    void api
+      .get<Catalog>('/catalog')
+      .then(setCatalog)
+      .catch(() => setCatalog(null));
   }, []);
 
   /**
@@ -80,7 +84,7 @@ export const PolicyPage: React.FC = () => {
     return () => observer.disconnect();
   }, [catalog]);
 
-  if (!catalog) return <PageLoader label="Đang tải chính sách..." />;
+  if (!catalog) return <PageLoader label="Loading policies…" />;
 
   const { site, packages, models } = catalog;
   const cheapest = models.reduce<(typeof models)[number] | null>(
@@ -97,13 +101,13 @@ export const PolicyPage: React.FC = () => {
           onClick={() => navigate(-1)}
           className="text-sm text-gray-400 hover:text-gray-100 transition-colors whitespace-nowrap"
         >
-          ← Quay lại
+          ← Back
         </button>
-        <span className="font-bold text-gray-100 truncate">Chính sách &amp; Điều khoản</span>
+        <span className="font-bold text-gray-100 truncate">Terms &amp; Policies</span>
 
         <div className="ml-auto flex items-center gap-3">
-          <Link to={user ? '/nap-tien' : '/dang-nhap'} className="text-sm text-brand-500 hover:underline whitespace-nowrap">
-            {user ? 'Mua điểm' : 'Đăng nhập'}
+          <Link to={user ? CREDITS : LOGIN} className="text-sm text-brand-500 hover:underline whitespace-nowrap">
+            {user ? 'Buy credits' : 'Sign in'}
           </Link>
           <ThemeToggle />
         </div>
@@ -111,16 +115,16 @@ export const PolicyPage: React.FC = () => {
 
       <div className="max-w-6xl mx-auto p-6">
         <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-100">Chính sách &amp; Điều khoản sử dụng</h1>
+          <h1 className="text-2xl font-bold text-gray-100">Terms of Service &amp; Policies</h1>
           <p className="text-sm text-gray-500 mt-1">
-            {site.policyUpdatedAt ? `Cập nhật lần cuối: ${site.policyUpdatedAt}.` : ''} Khi tạo tài khoản và thanh toán,
-            bạn được xem là đã đọc và đồng ý với các điều khoản dưới đây.
+            {site.policyUpdatedAt ? `Last updated: ${site.policyUpdatedAt}.` : ''} By creating an account and paying, you
+            confirm that you have read and agree to the terms below.
           </p>
         </div>
 
         {/* Màn hình hẹp: mục lục nằm trên nội dung, không dính theo cuộn */}
         <Card className="p-4 mb-6 lg:hidden">
-          <p className="text-[11px] uppercase tracking-wider text-gray-500 font-bold mb-2">Nội dung</p>
+          <p className="text-[11px] uppercase tracking-wider text-gray-500 font-bold mb-2">Contents</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1">
             {SECTIONS.map((section, index) => (
               <a
@@ -138,7 +142,7 @@ export const PolicyPage: React.FC = () => {
           {/* Màn hình rộng: mục lục là cột trái dính theo cuộn.
               top-20 = chiều cao thanh trên (3.5rem) cộng một khoảng thở. */}
           <aside className="hidden lg:block w-56 shrink-0 sticky top-20 max-h-[calc(100vh-6rem)] overflow-y-auto custom-scrollbar">
-            <p className="text-[11px] uppercase tracking-wider text-gray-500 font-bold mb-2 px-3">Nội dung</p>
+            <p className="text-[11px] uppercase tracking-wider text-gray-500 font-bold mb-2 px-3">Contents</p>
             <nav className="space-y-0.5">
               {SECTIONS.map((section, index) => {
                 const isActive = activeId === section.id;
@@ -152,8 +156,7 @@ export const PolicyPage: React.FC = () => {
                         : 'border-transparent text-gray-500 hover:text-gray-300 hover:bg-dark-850'
                     }`}
                   >
-                    <span className={isActive ? 'text-brand-500' : 'text-gray-600'}>{index + 1}.</span>{' '}
-                    {section.label}
+                    <span className={isActive ? 'text-brand-500' : 'text-gray-600'}>{index + 1}.</span> {section.label}
                   </a>
                 );
               })}
@@ -161,195 +164,208 @@ export const PolicyPage: React.FC = () => {
           </aside>
 
           <div className="flex-1 min-w-0 space-y-8">
+            {missingContact && (
+              <Alert tone="warning">
+                Contact details have not been filled in yet. Add them before selling to real customers.
+              </Alert>
+            )}
+
             <Card className="p-6 space-y-7">
-          <Section id="dich-vu" title="1. Về dịch vụ">
-            <p>
-              Design Copycat AI là dịch vụ tạo ảnh marketing bằng trí tuệ nhân tạo. Bạn tải lên ảnh mẫu và ảnh sản
-              phẩm, hệ thống gửi tới nhà cung cấp mô hình AI bên thứ ba để tạo ra ảnh mới theo bố cục của ảnh mẫu.
-            </p>
-            <p>
-              Chất lượng ảnh phụ thuộc vào mô hình AI của bên thứ ba. Chúng tôi không cam kết ảnh tạo ra sẽ đúng hoàn
-              toàn với mong muốn của bạn ở mọi lần tạo.
-            </p>
-          </Section>
+              <Section id="service" title="1. The service">
+                <p>
+                  Design Copycat AI generates marketing imagery with artificial intelligence. You upload a reference
+                  design and your own product photo; we send them to a third-party AI model provider, which produces a
+                  new image following the reference layout.
+                </p>
+                <p>
+                  Output quality depends on that third-party model. We do not guarantee that every generated image will
+                  match your expectations.
+                </p>
+              </Section>
 
-          <Section id="tai-khoan" title="2. Tài khoản">
-            <p>Mỗi địa chỉ email chỉ đăng ký được một tài khoản. Bạn chịu trách nhiệm bảo mật mật khẩu của mình.</p>
-            <p>
-              Chúng tôi có quyền tạm khoá tài khoản nếu phát hiện hành vi vi phạm mục 8, hoặc có dấu hiệu gian lận
-              thanh toán.
-            </p>
-          </Section>
+              <Section id="accounts" title="2. Accounts">
+                <p>One account per email address. You are responsible for keeping your password secure.</p>
+                <p>
+                  We may suspend an account if we detect a breach of section 8, or signs of payment fraud or chargeback
+                  abuse.
+                </p>
+              </Section>
 
-          <Section id="goi-cuoc" title="3. Điểm và cách tính">
-            <p>
-              Dịch vụ hoạt động theo mô hình <strong className="text-gray-300">trả trước bằng điểm</strong>: bạn mua
-              điểm và dùng dần. Không có phí thuê bao, không phí duy trì, không cam kết thời hạn và không tự động gia
-              hạn.
-            </p>
-            <p>
-              Số điểm tiêu hao cho mỗi ảnh phụ thuộc mô hình và độ phân giải bạn chọn
-              {cheapest && ` (thấp nhất là ${formatNumber(cheapest.tokenCost)} điểm/ảnh với ${cheapest.label})`}. Số
-              điểm sẽ trừ luôn được hiển thị trước khi bạn bấm tạo.
-            </p>
-            <p className="text-gray-300">
-              <strong>Điểm đã mua không hết hạn.</strong> Số dư được giữ trong tài khoản cho tới khi bạn dùng hết, kể cả
-              khi bạn ngừng sử dụng dịch vụ một thời gian dài.
-            </p>
-            <p>
-              Điểm không quy đổi ngược thành tiền mặt và không chuyển nhượng được sang tài khoản khác.
-            </p>
-            <p className="text-gray-500">
-              Các gói thuê bao theo tháng đã ngừng bán. Tài khoản đã mua gói trước đây vẫn được sử dụng hạn mức tháng
-              cho tới hết thời hạn đã thanh toán; sau đó tài khoản chuyển hoàn toàn sang dùng điểm như mọi tài khoản
-              khác. Phần điểm đã mua thêm không bị ảnh hưởng.
-            </p>
-          </Section>
+              <Section id="credits" title="3. Credits">
+                <p>
+                  The service is <strong className="text-gray-300">prepaid with credits</strong>: you buy credits and
+                  spend them as you go. There is no subscription, no maintenance fee, no minimum term and no automatic
+                  renewal.
+                </p>
+                <p>
+                  The number of credits an image costs depends on the model and resolution you pick
+                  {cheapest && ` (as low as ${formatNumber(cheapest.tokenCost)} credits per image with ${cheapest.label})`}.
+                  The exact cost is always shown before you start a generation.
+                </p>
+                <p className="text-gray-300">
+                  <strong>Purchased credits never expire.</strong> Your balance stays in your account until you spend it,
+                  even if you stop using the service for a long time.
+                </p>
+                <p>Credits have no cash value, cannot be converted back to money, and cannot be transferred between accounts.</p>
+                <p className="text-gray-500">
+                  Monthly subscription plans are no longer sold. Accounts that bought one previously keep their monthly
+                  allowance until the paid term ends, after which they move fully to credits like every other account.
+                  Separately purchased credits are unaffected.
+                </p>
+              </Section>
 
-          <Section id="diem-le" title="4. Mua điểm">
-            <p>
-              Bạn mua điểm theo các gói mệnh giá cố định.
-              {packages.length > 0 && (
-                <>
-                  {' '}
-                  Hiện có {packages.length} gói, từ{' '}
-                  {formatVnd(Math.min(...packages.map((pkg) => pkg.priceVnd)))} đến{' '}
-                  {formatVnd(Math.max(...packages.map((pkg) => pkg.priceVnd)))}.
-                </>
-              )}
-            </p>
-            <p>
-              Điểm được cộng vào tài khoản ngay sau khi hệ thống ghi nhận chuyển khoản thành công. Không cần đăng ký gói
-              hay điều kiện gì khác trước đó.
-            </p>
-            <p>Bạn mua thêm điểm bất cứ lúc nào, kể cả khi số dư vẫn còn.</p>
-          </Section>
+              <Section id="buying" title="4. Buying credits">
+                <p>
+                  Credits are sold in fixed packs.
+                  {packages.length > 0 && (
+                    <>
+                      {' '}
+                      There are currently {packages.length} packs, from{' '}
+                      {formatUsd(Math.min(...packages.map((pkg) => pkg.priceUsdCents)))} to{' '}
+                      {formatUsd(Math.max(...packages.map((pkg) => pkg.priceUsdCents)))}.
+                    </>
+                  )}
+                </p>
+                <p>
+                  Credits are added to your account as soon as the payment is confirmed. There is nothing else to sign up
+                  for and no prerequisite.
+                </p>
+                <p>You can buy more credits at any time, including while you still have a balance.</p>
+              </Section>
 
-          <Section id="thanh-toan" title="5. Thanh toán">
-            <p>
-              Thanh toán bằng chuyển khoản ngân hàng. Mỗi đơn hàng có một mã riêng, bạn{' '}
-              <strong className="text-gray-300">bắt buộc ghi đúng mã này vào nội dung chuyển khoản</strong> để hệ thống
-              nhận diện tự động.
-            </p>
-            <p>
-              Đơn hàng giữ chỗ trong {site.orderExpireMinutes} phút. Nếu bạn chuyển khoản muộn hơn, đơn vẫn được xử lý
-              bình thường khi tiền về tài khoản.
-            </p>
-            <p>
-              Chuyển khoản sai nội dung hoặc thiếu số tiền sẽ không được cộng tự động; những trường hợp này cần quản
-              trị viên đối chiếu và duyệt thủ công, có thể mất thêm thời gian.
-            </p>
-            <p>Giá niêm yết là giá cuối cùng. Phí chuyển khoản (nếu có) do ngân hàng của bạn thu.</p>
-          </Section>
+              <Section id="payments" title="5. Payments">
+                <p>
+                  Payments are processed by <strong className="text-gray-300">Stripe</strong>. You are redirected to
+                  Stripe&rsquo;s secure checkout page to enter your card details. We never receive or store your full card
+                  number.
+                </p>
+                <p>
+                  All prices are in <strong className="text-gray-300">US dollars (USD)</strong> and are the final amount
+                  charged. Your bank or card issuer may add a foreign transaction or currency conversion fee, which is
+                  outside our control.
+                </p>
+                <p>
+                  An order is held for {site.orderExpireMinutes} minutes. If the payment completes later than that, the
+                  order is still fulfilled once Stripe confirms it.
+                </p>
+                <p>
+                  If your card is charged but the credits do not appear within a few minutes, reopen the order page — the
+                  system re-checks with Stripe automatically. If it still does not resolve, contact us using section 12.
+                </p>
+              </Section>
 
-          <Section id="hoan-tra" title="6. Hoàn điểm & hoàn tiền">
-            <p>
-              <strong className="text-gray-300">Ảnh tạo thất bại được hoàn điểm tự động</strong>, trả về đúng nguồn đã
-              trừ. Bạn không bị mất điểm vì lỗi hệ thống hay lỗi từ nhà cung cấp AI.
-            </p>
-            <p>
-              Ảnh đã tạo thành công nhưng không đúng ý muốn thì không được hoàn điểm, vì chi phí gọi mô hình AI đã
-              phát sinh thực tế.
-            </p>
-            <p>
-              Điểm đã mua không quy đổi thành tiền mặt và không hoàn lại sau khi đã cộng vào tài khoản. Trường hợp bị
-              trừ tiền mà không nhận được điểm, vui lòng liên hệ theo mục 12 để được đối soát và xử lý.
-            </p>
-          </Section>
+              <Section id="refunds" title="6. Refunds">
+                <p>
+                  <strong className="text-gray-300">Failed generations are refunded automatically</strong>, back to the
+                  same credit source they were taken from. You never lose credits to a system error or a provider outage.
+                </p>
+                <p>
+                  Images that generate successfully but do not match your taste are not refundable — the AI provider cost
+                  has already been incurred.
+                </p>
+                <p>
+                  Purchased credits are non-refundable once added to your account and cannot be converted to cash. If you
+                  were charged without receiving credits, contact us using section 12 and we will reconcile it.
+                </p>
+              </Section>
 
-          <Section id="noi-dung" title="7. Nội dung & bản quyền">
-            <p>
-              Bạn phải có đầy đủ quyền đối với ảnh mình tải lên. Bạn chịu trách nhiệm nếu ảnh tải lên xâm phạm quyền
-              của bên thứ ba.
-            </p>
-            <p>
-              Ảnh do hệ thống tạo ra thuộc về bạn và bạn được toàn quyền sử dụng cho mục đích thương mại, trong phạm vi
-              điều khoản của nhà cung cấp mô hình AI cho phép.
-            </p>
-            <p>
-              Chúng tôi lưu ảnh đầu vào và ảnh kết quả trên máy chủ để phục vụ chức năng lịch sử và tải lại; chúng tôi
-              không bán hay chia sẻ ảnh của bạn cho bên thứ ba ngoài nhà cung cấp AI phục vụ chính việc tạo ảnh.
-            </p>
-          </Section>
+              <Section id="content" title="7. Content & ownership">
+                <p>
+                  You must hold the rights to every image you upload. You are responsible if an uploaded image infringes
+                  someone else&rsquo;s rights.
+                </p>
+                <p>
+                  Images the system generates are yours, and you may use them commercially, within the limits set by the
+                  AI provider&rsquo;s own terms.
+                </p>
+                <p>
+                  We store your input and output images on our servers so the History page and re-downloads work. We do
+                  not sell or share your images with third parties beyond the AI provider that performs the generation.
+                </p>
+              </Section>
 
-          <Section id="cam" title="8. Hành vi bị cấm">
-            <p>Không sử dụng dịch vụ để tạo hoặc phát tán:</p>
-            <ul className="list-disc pl-5 space-y-1">
-              <li>Nội dung vi phạm pháp luật Việt Nam;</li>
-              <li>Nội dung xâm phạm bản quyền, nhãn hiệu hoặc hình ảnh cá nhân của người khác;</li>
-              <li>Nội dung khiêu dâm, bạo lực, thù ghét hoặc gây hiểu nhầm nghiêm trọng;</li>
-              <li>Nội dung mạo danh tổ chức, cá nhân có thật;</li>
-              <li>Nội dung nhằm lừa đảo hoặc giả mạo giấy tờ, hoá đơn, chứng từ.</li>
-            </ul>
-            <p>Ngoài ra bạn cũng phải tuân thủ điều khoản của nhà cung cấp mô hình AI mà hệ thống sử dụng.</p>
-            <p>Tài khoản vi phạm sẽ bị khoá và không được hoàn lại điểm hay tiền đã thanh toán.</p>
-          </Section>
+              <Section id="prohibited" title="8. Prohibited use">
+                <p>Do not use the service to create or distribute:</p>
+                <ul className="list-disc pl-5 space-y-1">
+                  <li>Content that is unlawful in your jurisdiction or ours;</li>
+                  <li>Content that infringes copyright, trademarks, or a person&rsquo;s likeness;</li>
+                  <li>Sexual, violent, hateful, or seriously misleading content;</li>
+                  <li>Content impersonating a real organisation or individual;</li>
+                  <li>Content intended to defraud, or forged documents, receipts or records.</li>
+                </ul>
+                <p>You must also comply with the terms of the AI model provider the system uses.</p>
+                <p>Accounts in breach are suspended, with no refund of credits or money already paid.</p>
+              </Section>
 
-          <Section id="du-lieu" title="9. Dữ liệu & bảo mật">
-            <p>
-              Chúng tôi lưu: thông tin tài khoản (email, tên, số điện thoại), lịch sử đơn hàng, sổ ghi biến động điểm,
-              ảnh đầu vào và ảnh kết quả.
-            </p>
-            <p>Mật khẩu được lưu ở dạng đã băm, chúng tôi không đọc được mật khẩu của bạn.</p>
-            <p>
-              Ảnh của bạn được gửi tới nhà cung cấp mô hình AI để xử lý. Việc nhà cung cấp đó lưu trữ và sử dụng dữ
-              liệu tuân theo chính sách riêng của họ.
-            </p>
-            <p>Bạn có thể yêu cầu xoá tài khoản và dữ liệu liên quan bằng cách liên hệ theo mục 12.</p>
-          </Section>
+              <Section id="data" title="9. Data & privacy">
+                <p>
+                  We store your account details (email, name, phone number), order history, the credit ledger, and your
+                  input and output images.
+                </p>
+                <p>Passwords are stored hashed — we cannot read your password.</p>
+                <p>
+                  Your images are sent to the AI model provider for processing. How that provider stores and uses data is
+                  governed by their own policy.
+                </p>
+                <p>
+                  Payment data is handled by Stripe under their privacy policy; we only receive the payment status and a
+                  transaction reference.
+                </p>
+                <p>You can request deletion of your account and associated data by contacting us using section 12.</p>
+              </Section>
 
-          <Section id="trach-nhiem" title="10. Giới hạn trách nhiệm">
-            <p>
-              Dịch vụ phụ thuộc vào hạ tầng và mô hình AI của bên thứ ba, nên có thể gián đoạn do bảo trì, sự cố kỹ
-              thuật hoặc thay đổi từ phía nhà cung cấp.
-            </p>
-            <p>
-              Chúng tôi không chịu trách nhiệm với thiệt hại gián tiếp phát sinh từ việc sử dụng ảnh do hệ thống tạo
-              ra. Trách nhiệm tối đa trong mọi trường hợp không vượt quá số tiền bạn đã thanh toán cho chu kỳ dịch vụ
-              đang sử dụng.
-            </p>
-          </Section>
+              <Section id="liability" title="10. Limitation of liability">
+                <p>
+                  The service depends on third-party infrastructure and AI models, so it may be interrupted by
+                  maintenance, technical failures, or changes on the provider&rsquo;s side.
+                </p>
+                <p>
+                  We are not liable for indirect damages arising from your use of generated images. Our maximum liability
+                  in any case does not exceed the amount you have paid us in the preceding twelve months.
+                </p>
+              </Section>
 
-          <Section id="thay-doi" title="11. Thay đổi điều khoản">
-            <p>
-              Chúng tôi có thể điều chỉnh giá gói điểm, số điểm tiêu hao mỗi ảnh, danh sách mô hình và các điều khoản này
-              khi chi phí từ nhà cung cấp thay đổi.
-            </p>
-            <p>
-              Thay đổi <strong className="text-gray-300">không áp dụng ngược</strong> cho số điểm bạn đã mua: điểm đang
-              có trong tài khoản giữ nguyên giá trị, chỉ số điểm trừ mỗi ảnh của lần tạo sau mới theo bảng giá mới.
-            </p>
-          </Section>
+              <Section id="changes" title="11. Changes to these terms">
+                <p>
+                  We may adjust pack prices, credit costs per image, the model line-up, and these terms as our provider
+                  costs change.
+                </p>
+                <p>
+                  Changes are <strong className="text-gray-300">not applied retroactively</strong> to credits you already
+                  own: your existing balance keeps its value, and only generations started after a change use the new
+                  credit costs.
+                </p>
+              </Section>
 
-          <Section id="lien-he" title="12. Liên hệ">
-            {site.companyName && (
-              <p>
-                Đơn vị cung cấp dịch vụ: <strong className="text-gray-300">{site.companyName}</strong>
-              </p>
-            )}
-            {site.companyAddress && <p>Địa chỉ: {site.companyAddress}</p>}
-            {site.supportEmail && (
-              <p>
-                Email hỗ trợ:{' '}
-                <a href={`mailto:${site.supportEmail}`} className="text-brand-500 hover:underline">
-                  {site.supportEmail}
-                </a>
-              </p>
-            )}
-            {site.supportPhone && (
-              <p>
-                Điện thoại:{' '}
-                <a href={`tel:${site.supportPhone.replace(/\s/g, '')}`} className="text-brand-500 hover:underline">
-                  {site.supportPhone}
-                </a>
-              </p>
-            )}
-            {missingContact && <p className="text-gray-500">Thông tin liên hệ đang được cập nhật.</p>}
+              <Section id="contact" title="12. Contact">
+                {site.companyName && (
+                  <p>
+                    Service operated by: <strong className="text-gray-300">{site.companyName}</strong>
+                  </p>
+                )}
+                {site.companyAddress && <p>Address: {site.companyAddress}</p>}
+                {site.supportEmail && (
+                  <p>
+                    Support email:{' '}
+                    <a href={`mailto:${site.supportEmail}`} className="text-brand-500 hover:underline">
+                      {site.supportEmail}
+                    </a>
+                  </p>
+                )}
+                {site.supportPhone && (
+                  <p>
+                    Phone:{' '}
+                    <a href={`tel:${site.supportPhone.replace(/\s/g, '')}`} className="text-brand-500 hover:underline">
+                      {site.supportPhone}
+                    </a>
+                  </p>
+                )}
+                {missingContact && <p className="text-gray-500">Contact details are being updated.</p>}
               </Section>
             </Card>
 
             <p className="text-[11px] text-gray-600 text-center pb-4">
-              Các con số về giá và số điểm trong trang này được lấy trực tiếp từ bảng giá đang áp dụng.
+              Prices and credit figures on this page are read directly from the live price list.
             </p>
           </div>
         </div>

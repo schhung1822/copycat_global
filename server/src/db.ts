@@ -132,8 +132,84 @@ async function ensureIndex(
   return true;
 }
 
+/**
+ * Đổi tên cột nếu tên cũ còn tồn tại và tên mới thì chưa.
+ *
+ * Dùng cho lần chuyển đơn vị tiền VNĐ → USD cent. Đổi tên giữ nguyên dữ liệu,
+ * khoá ngoại và chỉ mục — an toàn hơn hẳn "thêm cột mới rồi bỏ cột cũ", vốn làm
+ * mất sạch lịch sử đơn hàng.
+ *
+ * Trả về true nếu vừa đổi tên (tức cài đặt này đang mang dữ liệu đơn vị cũ).
+ */
+async function renameColumn(
+  conn: mysql.Connection,
+  table: string,
+  from: string,
+  to: string,
+  definition: string,
+): Promise<boolean> {
+  const [rows] = await conn.query<RowDataPacket[]>(
+    `SELECT column_name FROM information_schema.columns
+      WHERE table_schema = ? AND table_name = ? AND column_name IN (?, ?)`,
+    [env.db.name, table, from, to],
+  );
+  const names = new Set(rows.map((row) => String(row.column_name ?? (row as any).COLUMN_NAME).toLowerCase()));
+  if (names.has(to.toLowerCase())) return false;
+  if (!names.has(from.toLowerCase())) return false;
+
+  // CHANGE thay vì RENAME COLUMN: MariaDB 10.4 chưa có RENAME COLUMN.
+  await conn.query(`ALTER TABLE \`${table}\` CHANGE \`${from}\` \`${to}\` ${definition}`);
+  console.log(`[migrate] Đã đổi tên cột ${table}.${from} → ${to}`);
+  return true;
+}
+
+/**
+ * Chuyển toàn bộ cột tiền từ VNĐ sang USD cent.
+ *
+ * CHỈ đổi TÊN cột, KHÔNG quy đổi giá trị: không có tỉ giá nào đúng cho mọi dòng
+ * (mỗi đơn được trả ở một thời điểm với một tỉ giá khác nhau), và đoán bừa một
+ * con số thì mọi báo cáo doanh thu về sau đều sai mà không ai phát hiện ra. Vì
+ * vậy hàm in cảnh báo thật to để người vận hành tự quyết định.
+ */
+async function migrateMoneyColumnsToUsdCents(conn: mysql.Connection): Promise<void> {
+  const renamed: string[] = [];
+  const track = async (table: string, from: string, to: string, definition: string) => {
+    if (await renameColumn(conn, table, from, to, definition)) renamed.push(`${table}.${from}`);
+  };
+
+  await track('users', 'total_topup_vnd', 'total_topup_usd_cents', 'BIGINT NOT NULL DEFAULT 0');
+  await track('subscription_plans', 'price_vnd', 'price_usd_cents', 'BIGINT NOT NULL');
+  await track('subscriptions', 'price_vnd', 'price_usd_cents', 'BIGINT NOT NULL');
+  await track('token_packages', 'price_vnd', 'price_usd_cents', 'BIGINT NOT NULL');
+  await track('orders', 'amount_vnd', 'amount_usd_cents', 'BIGINT NOT NULL');
+  await track('orders', 'credit_vnd', 'credit_usd_cents', 'BIGINT NOT NULL DEFAULT 0');
+  await track('orders', 'paid_amount_vnd', 'paid_amount_usd_cents', 'BIGINT NULL');
+  await track('payment_events', 'amount_vnd', 'amount_usd_cents', 'BIGINT NULL');
+  await track('affiliate_commissions', 'revenue_vnd', 'revenue_usd_cents', 'BIGINT NOT NULL');
+  await track('affiliate_commissions', 'token_cost_vnd', 'token_cost_usd_cents', 'BIGINT NOT NULL');
+  await track('affiliate_commissions', 'fixed_cost_vnd', 'fixed_cost_usd_cents', 'BIGINT NOT NULL DEFAULT 0');
+  await track('affiliate_commissions', 'profit_vnd', 'profit_usd_cents', 'BIGINT NOT NULL');
+  await track('affiliate_commissions', 'commission_vnd', 'commission_usd_cents', 'BIGINT NOT NULL');
+
+  if (renamed.length === 0) return;
+
+  console.warn(
+    `\n[migrate] ⚠  Đã đổi ${renamed.length} cột tiền sang đơn vị USD cent, NHƯNG GIÁ TRỊ BÊN TRONG VẪN LÀ SỐ VNĐ CŨ.\n` +
+      '    Cơ sở dữ liệu này được tạo từ bản bán bằng VNĐ. Trước khi mở bán lại, hãy:\n' +
+      '      1. Đặt lại giá gói điểm trong Quản trị → Bảng giá (nhập giá USD thật).\n' +
+      '      2. Quyết định cách xử lý lịch sử đơn cũ — hoặc chấp nhận báo cáo doanh thu\n' +
+      '         cũ hiển thị sai, hoặc chạy UPDATE quy đổi theo tỉ giá bạn chọn, ví dụ:\n' +
+      "         UPDATE orders SET amount_usd_cents = ROUND(amount_usd_cents / 250);\n" +
+      '    Cài đặt mới hoàn toàn (database rỗng) thì bỏ qua cảnh báo này.\n',
+  );
+}
+
 /** Nâng cấp cấu trúc cho những cài đặt đã chạy từ phiên bản trước. */
 async function applyMigrations(conn: mysql.Connection): Promise<void> {
+  // Chạy TRƯỚC mọi ensureColumn: các hàm bên dưới tra cột theo tên MỚI, nếu chưa
+  // đổi tên thì chúng sẽ thêm một cột trùng nghĩa nhưng rỗng, và dữ liệu cũ bị bỏ lại.
+  await migrateMoneyColumnsToUsdCents(conn);
+
   // Thuê bao tháng
   await ensureColumn(conn, 'users', 'subscription_expires_at', 'DATETIME NULL');
   await ensureColumn(conn, 'users', 'monthly_allowance', 'INT NOT NULL DEFAULT 0');
@@ -151,8 +227,14 @@ async function applyMigrations(conn: mysql.Connection): Promise<void> {
   await ensureColumn(conn, 'orders', 'subscription_months', 'INT NULL');
 
   // Nâng gói: phần khấu trừ từ gói cũ
-  await ensureColumn(conn, 'orders', 'credit_vnd', 'BIGINT NOT NULL DEFAULT 0');
+  await ensureColumn(conn, 'orders', 'credit_usd_cents', 'BIGINT NOT NULL DEFAULT 0');
   await ensureColumn(conn, 'orders', 'is_upgrade', 'TINYINT(1) NOT NULL DEFAULT 0');
+
+  // Stripe Checkout: phiên thanh toán gắn với đơn, để mở lại đúng phiên cũ và để
+  // hỏi thẳng Stripe khi webhook tới muộn (xem syncOrderFromStripe).
+  await ensureColumn(conn, 'orders', 'stripe_session_id', 'VARCHAR(190) NULL');
+  await ensureColumn(conn, 'orders', 'stripe_payment_intent', 'VARCHAR(190) NULL');
+  await ensureIndex(conn, 'orders', 'idx_orders_stripe_session', 'KEY idx_orders_stripe_session (stripe_session_id)');
 
   // Đánh dấu đơn đã được giao hàng (cộng điểm / kích hoạt gói).
   // Tách khỏi `status` để hệ thống ngoài chỉ cần đổi status = 'paid', phần giao

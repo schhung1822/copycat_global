@@ -33,10 +33,17 @@ adminRouter.use(requireAdmin);
 const num = (value: unknown): number => Number(value ?? 0) || 0;
 
 /**
- * Giá bán mỗi điểm ở gói lẻ. Quy ước 1 điểm = 1đ giá vốn nhà cung cấp và gói lẻ
- * bán gấp đôi giá vốn, nên mỗi điểm thu về 2đ.
+ * Giá VỐN của một điểm, tính bằng cent. Quy ước: CREDITS_PER_USD điểm = $1 giá
+ * vốn nhà cung cấp, nên 10.000 điểm/$1 cho ra 0,01 cent mỗi điểm.
  */
-const TOKEN_SELL_PRICE_VND = 2;
+const CREDIT_COST_CENTS = 100 / env.creditsPerUsd;
+
+/**
+ * Giá BÁN mỗi điểm, tính bằng cent. Gói điểm bán gấp đôi giá vốn nên đơn giá bán
+ * gấp đôi `CREDIT_COST_CENTS` — suy ra từ hằng số trên chứ không gõ tay, để đổi
+ * CREDITS_PER_USD thì mọi báo cáo tự khớp lại.
+ */
+const CREDIT_SELL_PRICE_CENTS = CREDIT_COST_CENTS * 2;
 
 // ---------------------------------------------------------------------------
 //  BẢNG ĐIỀU KHIỂN & BÁO CÁO
@@ -46,22 +53,23 @@ const TOKEN_SELL_PRICE_VND = 2;
  * Chỉ số tổng quan.
  *
  * Doanh thu  = tổng tiền các đơn đã thanh toán.
- * Chi phí vốn = tổng api_cost_usd của các ảnh tạo thành công, quy đổi theo USD_TO_VND.
+ * Chi phí vốn = tổng api_cost_usd của các ảnh tạo thành công.
  * Biên lợi nhuận gộp = (doanh thu − chi phí vốn) / doanh thu.
+ * Mọi số tiền trả về đều tính bằng USD CENT.
  */
 adminRouter.get(
   '/overview',
   asyncHandler(async (_req, res) => {
     const revenue = await queryOne<RowDataPacket & Record<string, number>>(
       `SELECT
-         COALESCE(SUM(amount_vnd), 0)                                                     AS total,
-         COALESCE(SUM(CASE WHEN DATE(paid_at) = CURDATE() THEN amount_vnd END), 0)        AS today,
-         COALESCE(SUM(CASE WHEN paid_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)  THEN amount_vnd END), 0) AS last7,
-         COALESCE(SUM(CASE WHEN paid_at >= DATE_SUB(NOW(), INTERVAL 30 DAY) THEN amount_vnd END), 0) AS last30,
+         COALESCE(SUM(amount_usd_cents), 0)                                               AS total,
+         COALESCE(SUM(CASE WHEN DATE(paid_at) = CURDATE() THEN amount_usd_cents END), 0)  AS today,
+         COALESCE(SUM(CASE WHEN paid_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)  THEN amount_usd_cents END), 0) AS last7,
+         COALESCE(SUM(CASE WHEN paid_at >= DATE_SUB(NOW(), INTERVAL 30 DAY) THEN amount_usd_cents END), 0) AS last30,
          COUNT(*)                                                                          AS paid_orders,
          COALESCE(SUM(total_tokens), 0)                                                    AS tokens_sold,
-         COALESCE(SUM(CASE WHEN order_type = 'subscription'  THEN amount_vnd END), 0)      AS subscription_revenue,
-         COALESCE(SUM(CASE WHEN order_type = 'token_package' THEN amount_vnd END), 0)      AS extra_revenue
+         COALESCE(SUM(CASE WHEN order_type = 'subscription'  THEN amount_usd_cents END), 0) AS subscription_revenue,
+         COALESCE(SUM(CASE WHEN order_type = 'token_package' THEN amount_usd_cents END), 0) AS extra_revenue
        FROM orders WHERE status = 'paid'`,
     );
 
@@ -124,7 +132,7 @@ adminRouter.get(
     );
 
     const totalRevenue = num(revenue?.total);
-    const apiCostVnd = num(generations?.api_cost_usd) * env.usdToVnd;
+    const apiCostCents = num(generations?.api_cost_usd) * 100;
 
     res.json({
       revenue: {
@@ -149,9 +157,9 @@ adminRouter.get(
         newToday: num(users?.new_today),
         new30Days: num(users?.new_30d),
         // Điểm khách đã BỎ TIỀN MUA nhưng chưa dùng — nghĩa vụ phải phục vụ.
-        // 1 điểm = 1đ giá vốn, bán ra gấp đôi nên quy tiền là ×2.
+        // Quy ra tiền theo ĐƠN GIÁ BÁN: đó là số tiền khách đã trả cho phần chưa dùng.
         outstandingTokens: num(users?.outstanding_tokens),
-        outstandingLiabilityVnd: Math.round(num(users?.outstanding_tokens) * 2),
+        outstandingLiabilityUsdCents: Math.round(num(users?.outstanding_tokens) * CREDIT_SELL_PRICE_CENTS),
       },
       tokens: {
         /** Điểm đã bán ra qua các đơn đã thanh toán */
@@ -175,10 +183,11 @@ adminRouter.get(
       },
       cost: {
         apiCostUsd: Math.round(num(generations?.api_cost_usd) * 10000) / 10000,
-        apiCostVnd: Math.round(apiCostVnd),
-        grossProfitVnd: Math.round(totalRevenue - apiCostVnd),
-        grossMarginPercent: totalRevenue > 0 ? Math.round(((totalRevenue - apiCostVnd) / totalRevenue) * 1000) / 10 : 0,
-        usdToVnd: env.usdToVnd,
+        apiCostUsdCents: Math.round(apiCostCents),
+        grossProfitUsdCents: Math.round(totalRevenue - apiCostCents),
+        grossMarginPercent:
+          totalRevenue > 0 ? Math.round(((totalRevenue - apiCostCents) / totalRevenue) * 1000) / 10 : 0,
+        creditsPerUsd: env.creditsPerUsd,
       },
       system: {
         queue: queueStatus(),
@@ -197,7 +206,7 @@ adminRouter.get(
     const days = Math.min(Math.max(Number(req.query.days) || 30, 7), 180);
 
     const revenue = await query<RowDataPacket & { day: string; revenue: number; orders: number }>(
-      `SELECT DATE(paid_at) AS day, SUM(amount_vnd) AS revenue, COUNT(*) AS orders
+      `SELECT DATE(paid_at) AS day, SUM(amount_usd_cents) AS revenue, COUNT(*) AS orders
          FROM orders
         WHERE status = 'paid' AND paid_at >= DATE_SUB(CURDATE(), INTERVAL ? DAY)
         GROUP BY DATE(paid_at)`,
@@ -252,13 +261,13 @@ adminRouter.get(
       const apiCostUsd = num(imageMap.get(day)?.cost);
       series.push({
         day,
-        revenueVnd: num(revenueMap.get(day)?.revenue),
+        revenueUsdCents: num(revenueMap.get(day)?.revenue),
         orders: num(revenueMap.get(day)?.orders),
         newUsers: num(signupMap.get(day)?.total),
         images: num(imageMap.get(day)?.total),
         successImages: num(imageMap.get(day)?.success),
         tokensSpent: num(spendMap.get(day)?.used),
-        apiCostVnd: Math.round(apiCostUsd * env.usdToVnd),
+        apiCostUsdCents: Math.round(apiCostUsd * 100),
       });
     }
 
@@ -283,9 +292,9 @@ adminRouter.get(
 
     res.json({
       models: rows.map((row) => {
-        // 1 điểm = 1đ giá vốn, bán gấp đôi → doanh thu quy đổi = số điểm × 2.
-        const tokenValueVnd = num(row.tokens) * TOKEN_SELL_PRICE_VND;
-        const costVnd = num(row.cost_usd) * env.usdToVnd;
+        // Doanh thu quy đổi của số điểm đã tiêu, theo đơn giá bán.
+        const tokenValueCents = num(row.tokens) * CREDIT_SELL_PRICE_CENTS;
+        const costCents = num(row.cost_usd) * 100;
         return {
           modelCode: row.model_code,
           modelLabel: row.model_label,
@@ -293,9 +302,10 @@ adminRouter.get(
           total: num(row.total),
           success: num(row.success),
           tokensSpent: num(row.tokens),
-          tokenValueVnd: Math.round(tokenValueVnd),
-          apiCostVnd: Math.round(costVnd),
-          marginPercent: tokenValueVnd > 0 ? Math.round(((tokenValueVnd - costVnd) / tokenValueVnd) * 1000) / 10 : 0,
+          tokenValueUsdCents: Math.round(tokenValueCents),
+          apiCostUsdCents: Math.round(costCents),
+          marginPercent:
+            tokenValueCents > 0 ? Math.round(((tokenValueCents - costCents) / tokenValueCents) * 1000) / 10 : 0,
         };
       }),
     });
@@ -307,10 +317,10 @@ adminRouter.get(
   '/reports/top-users',
   asyncHandler(async (_req, res) => {
     const rows = await query<RowDataPacket & Record<string, any>>(
-      `SELECT u.id, u.email, u.full_name, u.total_topup_vnd, u.token_balance, u.total_tokens_out,
+      `SELECT u.id, u.email, u.full_name, u.total_topup_usd_cents, u.token_balance, u.total_tokens_out,
               (SELECT COUNT(*) FROM generations g WHERE g.user_id = u.id AND g.status = 'success') AS images
          FROM users u
-        ORDER BY u.total_topup_vnd DESC, u.total_tokens_out DESC
+        ORDER BY u.total_topup_usd_cents DESC, u.total_tokens_out DESC
         LIMIT 20`,
     );
 
@@ -319,7 +329,7 @@ adminRouter.get(
         id: row.id,
         email: row.email,
         fullName: row.full_name,
-        totalTopupVnd: num(row.total_topup_vnd),
+        totalTopupUsdCents: num(row.total_topup_usd_cents),
         tokenBalance: num(row.token_balance),
         tokensSpent: num(row.total_tokens_out),
         images: num(row.images),
@@ -344,7 +354,7 @@ adminRouter.get(
     const rows = await query<RowDataPacket & Record<string, any>>(
       `SELECT u.id, u.email, u.full_name, u.phone, u.role, u.status, u.token_balance,
               u.subscription_expires_at, u.monthly_allowance, u.monthly_tokens, u.monthly_period_end,
-              u.total_topup_vnd, u.total_tokens_in, u.total_tokens_out, u.last_login_at, u.created_at,
+              u.total_topup_usd_cents, u.total_tokens_in, u.total_tokens_out, u.last_login_at, u.created_at,
               u.is_affiliate, u.affiliate_code,
               (SELECT r.email FROM users r WHERE r.id = u.referred_by) AS referrer_email,
               (SELECT s.plan_name FROM subscriptions s
@@ -379,7 +389,7 @@ adminRouter.get(
         monthlyPeriodEnd: row.monthly_period_end,
         subscriptionExpiresAt: row.subscription_expires_at,
         planName: row.plan_name ?? null,
-        totalTopupVnd: num(row.total_topup_vnd),
+        totalTopupUsdCents: num(row.total_topup_usd_cents),
         tokensIn: num(row.total_tokens_in),
         tokensOut: num(row.total_tokens_out),
         lastLoginAt: row.last_login_at,
@@ -457,7 +467,7 @@ adminRouter.patch(
     }
 
     if (hasField(body, 'status')) {
-      const status = requireString(body, 'status', { label: 'Trạng thái' });
+      const status = requireString(body, 'status', { label: 'Status' });
       if (!['active', 'banned'].includes(status)) throw badRequest('Trạng thái chỉ nhận "active" hoặc "banned".');
       // Tự khoá chính mình là mất quyền vào bảng điều khiển ngay lập tức, và chỉ mở
       // lại được bằng cách sửa thẳng vào cơ sở dữ liệu.
@@ -473,7 +483,7 @@ adminRouter.patch(
     // hiện "120.000 / 50.000". Nhưng số dư chỉ được đổi kèm một dòng sổ cái, nên
     // phần này làm riêng trong transaction ở dưới chứ không nhét vào câu UPDATE.
     const allowance = hasField(body, 'monthlyAllowance')
-      ? requireInt(body, 'monthlyAllowance', { min: 0, max: 100_000_000, label: 'Hạn mức tháng' })
+      ? requireInt(body, 'monthlyAllowance', { min: 0, max: 100_000_000, label: 'Monthly allowance' })
       : null;
     if (allowance !== null) set('monthly_allowance', allowance);
 
@@ -516,7 +526,7 @@ adminRouter.patch(
 adminRouter.post(
   '/users/:id/password',
   asyncHandler(async (req, res) => {
-    const password = requireString(req.body, 'password', { min: 8, max: 72, label: 'Mật khẩu mới' });
+    const password = requireString(req.body, 'password', { min: 8, max: 72, label: 'New password' });
 
     const result = await execute('UPDATE users SET password_hash = ? WHERE id = ?', [
       await hashPassword(password),
@@ -535,9 +545,9 @@ adminRouter.post(
 adminRouter.post(
   '/users/:id/tokens',
   asyncHandler(async (req, res) => {
-    const amount = requireInt(req.body, 'amount', { label: 'Số điểm' });
+    const amount = requireInt(req.body, 'amount', { label: 'Credit amount' });
     if (amount === 0) throw badRequest('Số điểm phải khác 0.');
-    const reason = requireString(req.body, 'reason', { label: 'Lý do', max: 200 });
+    const reason = requireString(req.body, 'reason', { label: 'Reason', max: 200 });
 
     const bucket = optionalString(req.body, 'bucket') ?? 'purchased';
     if (!['monthly', 'purchased'].includes(bucket)) {
@@ -569,13 +579,13 @@ adminRouter.post(
 /**
  * Cấp gói dịch vụ thẳng cho khách, không qua đơn thanh toán.
  *
- * Dùng khi khách trả tiền ngoài luồng (chuyển khoản sai nội dung, thu tiền mặt,
+ * Dùng khi khách trả tiền ngoài luồng Stripe (thu tiền mặt,
  * hợp đồng riêng), khi tặng gói dùng thử, hoặc khi bật **gói miễn phí** — gói 0đ
  * không có hạn mức tháng, chỉ mở khoá tài khoản để khách mua điểm lẻ.
  *
  * Chạy qua đúng `activateSubscription` mà đơn đã thanh toán vẫn dùng, nên bản ghi
  * trong bảng `subscriptions` và các dòng sổ cái hạn mức giống hệt luồng mua bình
- * thường. Khác biệt duy nhất: `order_id` để NULL và không cộng `total_topup_vnd`,
+ * thường. Khác biệt duy nhất: `order_id` để NULL và không cộng `total_topup_usd_cents`,
  * vì đây không phải doanh thu — báo cáo không được tính khống.
  *
  * `mode`:
@@ -588,7 +598,7 @@ adminRouter.post(
   '/users/:id/subscription',
   asyncHandler(async (req, res) => {
     const userId = Number(req.params.id);
-    const planId = requireInt(req.body, 'planId', { min: 1, label: 'Gói dịch vụ' });
+    const planId = requireInt(req.body, 'planId', { min: 1, label: 'Plan' });
 
     const mode = optionalString(req.body, 'mode') ?? 'extend';
     if (!['extend', 'restart'].includes(mode)) {
@@ -600,7 +610,7 @@ adminRouter.post(
     const months =
       req.body?.months === undefined || req.body?.months === null || req.body?.months === ''
         ? null
-        : requireInt(req.body, 'months', { min: 1, max: 120, label: 'Số tháng' });
+        : requireInt(req.body, 'months', { min: 1, max: 120, label: 'Months' });
 
     const user = await queryOne<RowDataPacket & { email: string }>('SELECT email FROM users WHERE id = ?', [userId]);
     if (!user) throw notFound('Không tìm thấy tài khoản.');
@@ -618,7 +628,7 @@ adminRouter.post(
           code: plan.code,
           name: plan.name,
           months: months ?? plan.months,
-          priceVnd: plan.price_vnd,
+          priceUsdCents: plan.price_usd_cents,
           allowance: plan.monthly_token_allowance,
         },
         null,
@@ -683,7 +693,7 @@ adminRouter.get(
   asyncHandler(async (_req, res) => {
     const settings = await readAffiliateSettings();
     const sample = await queryOne<PackageRow>(
-      'SELECT * FROM token_packages WHERE is_active = 1 ORDER BY is_popular DESC, sort_order, price_vnd LIMIT 1',
+      'SELECT * FROM token_packages WHERE is_active = 1 ORDER BY is_popular DESC, sort_order, price_usd_cents LIMIT 1',
     );
 
     res.json({
@@ -693,7 +703,7 @@ adminRouter.get(
             packageName: sample.name,
             tokens: sample.base_tokens + sample.bonus_tokens,
             ...computeCommission(
-              { revenueVnd: sample.price_vnd, tokensDelivered: sample.base_tokens + sample.bonus_tokens },
+              { revenueUsdCents: sample.price_usd_cents, tokensDelivered: sample.base_tokens + sample.bonus_tokens },
               settings,
             ),
           }
@@ -711,7 +721,7 @@ adminRouter.patch(
     const settings = await saveAffiliateSettings({
       enabled: body.enabled === undefined ? undefined : Boolean(body.enabled),
       commissionPercent: number('commissionPercent'),
-      fixedCostVnd: number('fixedCostVnd'),
+      fixedCostUsdCents: number('fixedCostUsdCents'),
       fixedCostPercent: number('fixedCostPercent'),
     });
 
@@ -780,8 +790,8 @@ adminRouter.get(
     );
     const totals = await queryOne<RowDataPacket & Record<string, number>>(
       `SELECT COUNT(*) AS total,
-              COALESCE(SUM(CASE WHEN c.status = 'pending' THEN c.commission_vnd END), 0) AS pending,
-              COALESCE(SUM(CASE WHEN c.status = 'paid'    THEN c.commission_vnd END), 0) AS paid
+              COALESCE(SUM(CASE WHEN c.status = 'pending' THEN c.commission_usd_cents END), 0) AS pending,
+              COALESCE(SUM(CASE WHEN c.status = 'paid'    THEN c.commission_usd_cents END), 0) AS paid
          FROM affiliate_commissions c ${where}`,
       params,
     );
@@ -795,8 +805,8 @@ adminRouter.get(
       page,
       limit,
       total: num(totals?.total),
-      pendingVnd: num(totals?.pending),
-      paidVnd: num(totals?.paid),
+      pendingUsdCents: num(totals?.pending),
+      paidUsdCents: num(totals?.paid),
     });
   }),
 );
@@ -811,7 +821,7 @@ adminRouter.get(
 adminRouter.post(
   '/affiliate/commissions/:id/status',
   asyncHandler(async (req, res) => {
-    const status = requireString(req.body, 'status', { label: 'Trạng thái' });
+    const status = requireString(req.body, 'status', { label: 'Status' });
     if (!['pending', 'paid', 'cancelled'].includes(status)) {
       throw badRequest('Trạng thái chỉ nhận "pending", "paid" hoặc "cancelled".');
     }
@@ -838,7 +848,7 @@ adminRouter.post(
     const affiliateId = Number(req.params.id);
 
     const pending = await queryOne<RowDataPacket & { total: number; amount: number }>(
-      `SELECT COUNT(*) AS total, COALESCE(SUM(commission_vnd), 0) AS amount
+      `SELECT COUNT(*) AS total, COALESCE(SUM(commission_usd_cents), 0) AS amount
          FROM affiliate_commissions WHERE affiliate_user_id = ? AND status = 'pending'`,
       [affiliateId],
     );
@@ -851,7 +861,7 @@ adminRouter.post(
       [req.user!.id, optionalString(req.body, 'note', 255), affiliateId],
     );
 
-    res.json({ ok: true, count: num(pending?.total), amountVnd: num(pending?.amount) });
+    res.json({ ok: true, count: num(pending?.total), amountUsdCents: num(pending?.amount) });
   }),
 );
 
@@ -901,7 +911,7 @@ adminRouter.get(
   }),
 );
 
-/** Duyệt tay đơn nạp — dùng khi khách chuyển khoản sai nội dung. */
+/** Duyệt tay đơn nạp — dùng khi khách trả tiền ngoài Stripe, hoặc cứu giao dịch thất lạc. */
 adminRouter.post(
   '/orders/:code/approve',
   asyncHandler(async (req, res) => {
@@ -928,7 +938,7 @@ adminRouter.post(
   }),
 );
 
-/** Nhật ký webhook ngân hàng — tra khi khách báo đã chuyển mà chưa nhận điểm. */
+/** Nhật ký webhook Stripe — tra khi khách báo đã trả tiền mà chưa nhận điểm. */
 adminRouter.get(
   '/payment-events',
   asyncHandler(async (req, res) => {
@@ -944,7 +954,7 @@ adminRouter.get(
         provider: row.provider,
         externalId: row.external_id,
         orderCode: row.order_code,
-        amountVnd: num(row.amount_vnd),
+        amountUsdCents: num(row.amount_usd_cents),
         content: row.content,
         status: row.status,
         message: row.message,
@@ -974,21 +984,21 @@ adminRouter.get(
         family: row.family,
         resolution: row.resolution,
         apiCostUsd: Number(row.api_cost_usd),
-        apiCostVnd: Math.round(Number(row.api_cost_usd) * env.usdToVnd),
+        apiCostUsdCents: Math.round(Number(row.api_cost_usd) * 100),
         tokenCost: row.token_cost,
-        // Giá bán khi khách dùng điểm mua thêm = số điểm × 2đ.
-        sellPriceVnd: row.token_cost * TOKEN_SELL_PRICE_VND,
+        // Doanh thu của một ảnh, quy theo đơn giá bán mỗi điểm.
+        sellPriceUsdCents: Math.round(row.token_cost * CREDIT_SELL_PRICE_CENTS),
         marginPercent: (() => {
-          const sell = row.token_cost * TOKEN_SELL_PRICE_VND;
+          const sell = row.token_cost * CREDIT_SELL_PRICE_CENTS;
           if (sell <= 0) return 0;
-          return Math.round(((sell - Number(row.api_cost_usd) * env.usdToVnd) / sell) * 1000) / 10;
+          return Math.round(((sell - Number(row.api_cost_usd) * 100) / sell) * 1000) / 10;
         })(),
         isActive: Boolean(row.is_active),
         isEstimateReference: Boolean(row.is_estimate_reference),
         sortOrder: row.sort_order,
         notes: row.notes,
       })),
-      usdToVnd: env.usdToVnd,
+      creditsPerUsd: env.creditsPerUsd,
     });
   }),
 );
@@ -1002,14 +1012,14 @@ adminRouter.post(
          (code, provider, provider_model, label, family, resolution, api_cost_usd, token_cost, sort_order, notes)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
-        requireString(req.body, 'code', { label: 'Mã model', max: 80 }),
-        requireString(req.body, 'provider', { label: 'Nhà cung cấp', max: 50 }),
-        requireString(req.body, 'providerModel', { label: 'Slug model', max: 120 }),
-        requireString(req.body, 'label', { label: 'Tên hiển thị', max: 120 }),
-        requireString(req.body, 'family', { label: 'Nhóm model', max: 80 }),
-        requireString(req.body, 'resolution', { label: 'Độ phân giải', max: 16 }),
+        requireString(req.body, 'code', { label: 'Model code', max: 80 }),
+        requireString(req.body, 'provider', { label: 'Provider', max: 50 }),
+        requireString(req.body, 'providerModel', { label: 'Provider slug', max: 120 }),
+        requireString(req.body, 'label', { label: 'Display name', max: 120 }),
+        requireString(req.body, 'family', { label: 'Model family', max: 80 }),
+        requireString(req.body, 'resolution', { label: 'Resolution', max: 16 }),
         Number(req.body.apiCostUsd) || 0,
-        requireInt(req.body, 'tokenCost', { min: 1, label: 'Số điểm' }),
+        requireInt(req.body, 'tokenCost', { min: 1, label: 'Credit cost' }),
         Number(req.body.sortOrder) || 0,
         optionalString(req.body, 'notes', 255),
       ],
@@ -1125,17 +1135,20 @@ adminRouter.patch(
 adminRouter.get(
   '/packages',
   asyncHandler(async (_req, res) => {
-    const rows = await query<PackageRow>('SELECT * FROM token_packages ORDER BY sort_order, price_vnd');
+    const rows = await query<PackageRow>('SELECT * FROM token_packages ORDER BY sort_order, price_usd_cents');
     res.json({
       packages: rows.map((row) => ({
         id: row.id,
         code: row.code,
         name: row.name,
-        priceVnd: row.price_vnd,
+        priceUsdCents: row.price_usd_cents,
         baseTokens: row.base_tokens,
         bonusTokens: row.bonus_tokens,
         totalTokens: row.base_tokens + row.bonus_tokens,
-        pricePerToken: Math.round((row.price_vnd / (row.base_tokens + row.bonus_tokens)) * 10) / 10,
+        // Giữ 4 chữ số thập phân: một điểm chỉ đáng khoảng 0,02 cent nên làm tròn
+        // tới số nguyên là mọi gói cùng hiện ra 0.
+        pricePerTokenCents:
+          Math.round((row.price_usd_cents / (row.base_tokens + row.bonus_tokens)) * 10_000) / 10_000,
         description: row.description,
         isPopular: Boolean(row.is_popular),
         isActive: Boolean(row.is_active),
@@ -1150,7 +1163,7 @@ adminRouter.patch(
   asyncHandler(async (req, res) => {
     const allowed: Record<string, string> = {
       name: 'name',
-      priceVnd: 'price_vnd',
+      priceUsdCents: 'price_usd_cents',
       baseTokens: 'base_tokens',
       bonusTokens: 'bonus_tokens',
       description: 'description',
@@ -1179,13 +1192,13 @@ adminRouter.post(
   '/packages',
   asyncHandler(async (req, res) => {
     const result = await execute(
-      `INSERT INTO token_packages (code, name, price_vnd, base_tokens, bonus_tokens, description, sort_order)
+      `INSERT INTO token_packages (code, name, price_usd_cents, base_tokens, bonus_tokens, description, sort_order)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
       [
-        requireString(req.body, 'code', { label: 'Mã gói', max: 50 }).toUpperCase(),
-        requireString(req.body, 'name', { label: 'Tên gói', max: 120 }),
-        requireInt(req.body, 'priceVnd', { min: 1000, label: 'Giá nạp' }),
-        requireInt(req.body, 'baseTokens', { min: 1, label: 'Điểm cơ bản' }),
+        requireString(req.body, 'code', { label: 'Pack code', max: 50 }).toUpperCase(),
+        requireString(req.body, 'name', { label: 'Pack name', max: 120 }),
+        requireInt(req.body, 'priceUsdCents', { min: 50, label: 'Price in cents' }),
+        requireInt(req.body, 'baseTokens', { min: 1, label: 'Base credits' }),
         Number(req.body.bonusTokens) || 0,
         optionalString(req.body, 'description', 255),
         Number(req.body.sortOrder) || 0,
@@ -1209,11 +1222,11 @@ adminRouter.get(
         code: row.code,
         name: row.name,
         months: row.months,
-        priceVnd: row.price_vnd,
-        pricePerMonthVnd: Math.round(row.price_vnd / row.months),
+        priceUsdCents: row.price_usd_cents,
+        pricePerMonthUsdCents: Math.round(row.price_usd_cents / row.months),
         monthlyTokenAllowance: row.monthly_token_allowance,
-        // Hạn mức quy ra tiền vốn: 1 điểm = 1đ giá vốn
-        allowanceCostVnd: row.monthly_token_allowance,
+        // Hạn mức quy ra tiền vốn theo CREDITS_PER_USD.
+        allowanceCostUsdCents: Math.round(row.monthly_token_allowance * CREDIT_COST_CENTS),
         description: row.description,
         isPopular: Boolean(row.is_popular),
         isActive: Boolean(row.is_active),
@@ -1229,7 +1242,7 @@ adminRouter.patch(
     const allowed: Record<string, string> = {
       name: 'name',
       months: 'months',
-      priceVnd: 'price_vnd',
+      priceUsdCents: 'price_usd_cents',
       monthlyTokenAllowance: 'monthly_token_allowance',
       description: 'description',
       isPopular: 'is_popular',

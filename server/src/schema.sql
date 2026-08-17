@@ -2,7 +2,11 @@
 --  DESIGN COPYCAT AI — SƠ ĐỒ CƠ SỞ DỮ LIỆU (MySQL 8 / MariaDB 10.4+)
 --  Server tự chạy file này khi khởi động nếu DB_AUTO_MIGRATE=true.
 --  Mọi câu lệnh đều idempotent (IF NOT EXISTS) nên chạy lại vô hại.
---  Đơn vị tiền: VND, lưu dạng số nguyên (BIGINT), không có phần thập phân.
+--
+--  ĐƠN VỊ TIỀN: **USD CENTS**, lưu dạng số nguyên (BIGINT). $49.99 = 4999.
+--  Mọi cột tiền đều mang hậu tố `_usd_cents`. Không bao giờ lưu số thực —
+--  Stripe cũng nhận `unit_amount` bằng cent nên hai bên khớp nhau tuyệt đối,
+--  và cộng trừ số nguyên thì không có sai số làm tròn tích luỹ trong sổ cái.
 --
 --  LƯU Ý VỀ TÊN GỌI: đơn vị tiêu dùng của khách nay gọi là ĐIỂM trên toàn bộ
 --  giao diện, nhưng tên cột và tên bảng vẫn giữ tiền tố `token_`
@@ -50,7 +54,7 @@ CREATE TABLE IF NOT EXISTS users (
   monthly_period_end  DATETIME    NULL,
 
   -- Số liệu tích luỹ, phục vụ báo cáo nhanh không phải quét bảng ledger.
-  total_topup_vnd BIGINT          NOT NULL DEFAULT 0,
+  total_topup_usd_cents BIGINT    NOT NULL DEFAULT 0,
   total_tokens_in INT             NOT NULL DEFAULT 0,
   total_tokens_out INT            NOT NULL DEFAULT 0,
   last_login_at   DATETIME        NULL,
@@ -73,7 +77,7 @@ CREATE TABLE IF NOT EXISTS subscription_plans (
   code          VARCHAR(50)  NOT NULL,           -- vd: MONTHLY_1, MONTHLY_12
   name          VARCHAR(120) NOT NULL,
   months        INT          NOT NULL,           -- chu kỳ: 1, 3, 6, 12
-  price_vnd     BIGINT       NOT NULL,           -- tổng tiền cho cả chu kỳ
+  price_usd_cents BIGINT     NOT NULL,           -- tổng tiền cho cả chu kỳ (cent)
   -- Hạn mức token cấp lại MỖI THÁNG (không cộng dồn sang tháng sau)
   monthly_token_allowance INT NOT NULL,
   description   VARCHAR(255) NULL,
@@ -97,7 +101,7 @@ CREATE TABLE IF NOT EXISTS subscriptions (
   plan_code     VARCHAR(50)     NULL,
   plan_name     VARCHAR(120)    NOT NULL,
   months        INT             NOT NULL,
-  price_vnd     BIGINT          NOT NULL,
+  price_usd_cents BIGINT        NOT NULL,
   monthly_token_allowance INT   NOT NULL,
   status        ENUM('active','expired','cancelled') NOT NULL DEFAULT 'active',
   order_id      BIGINT UNSIGNED NULL,
@@ -117,9 +121,9 @@ CREATE TABLE IF NOT EXISTS subscriptions (
 CREATE TABLE IF NOT EXISTS token_packages (
   id            INT UNSIGNED NOT NULL AUTO_INCREMENT,
   code          VARCHAR(50)  NOT NULL,          -- vd: STARTER, CREATOR
-  name          VARCHAR(120) NOT NULL,          -- vd: Trải nghiệm
-  price_vnd     BIGINT       NOT NULL,          -- giá nạp
-  base_tokens   INT          NOT NULL,          -- token cơ bản (giá nạp / 100)
+  name          VARCHAR(120) NOT NULL,          -- vd: Starter
+  price_usd_cents BIGINT     NOT NULL,          -- giá bán, tính bằng cent
+  base_tokens   INT          NOT NULL,          -- điểm cơ bản
   bonus_tokens  INT          NOT NULL DEFAULT 0,-- token thưởng thêm
   description   VARCHAR(255) NULL,
   is_popular    TINYINT(1)   NOT NULL DEFAULT 0,
@@ -173,20 +177,25 @@ CREATE TABLE IF NOT EXISTS orders (
   -- Snapshot thông tin gói tại thời điểm đặt, để đổi bảng giá không làm sai lịch sử.
   package_code    VARCHAR(50)     NULL,
   package_name    VARCHAR(120)    NOT NULL,
-  amount_vnd      BIGINT          NOT NULL,   -- số tiền khách thực trả
+  amount_usd_cents BIGINT         NOT NULL,   -- số tiền khách phải trả (cent)
   -- Nâng gói: số tiền được khấu trừ từ phần chưa dùng của gói cũ.
-  -- Giá niêm yết của gói mới = amount_vnd + credit_vnd.
-  credit_vnd      BIGINT          NOT NULL DEFAULT 0,
+  -- Giá niêm yết của gói mới = amount_usd_cents + credit_usd_cents.
+  credit_usd_cents BIGINT         NOT NULL DEFAULT 0,
   is_upgrade      TINYINT(1)      NOT NULL DEFAULT 0,
   base_tokens     INT             NOT NULL,
   bonus_tokens    INT             NOT NULL DEFAULT 0,
   total_tokens    INT             NOT NULL,
   status          ENUM('pending','paid','cancelled','expired') NOT NULL DEFAULT 'pending',
-  payment_method  VARCHAR(40)     NOT NULL DEFAULT 'bank_transfer',
-  -- Nguồn xác nhận: sepay / casso / manual
+  payment_method  VARCHAR(40)     NOT NULL DEFAULT 'stripe',
+  -- Phiên Stripe Checkout đang gắn với đơn này. Lưu lại để (1) khách quay lại
+  -- trang đơn thì mở đúng phiên cũ thay vì tạo phiên mới, và (2) server hỏi
+  -- thẳng Stripe được trạng thái đơn khi webhook tới muộn hoặc chưa cấu hình.
+  stripe_session_id  VARCHAR(190) NULL,
+  stripe_payment_intent VARCHAR(190) NULL,
+  -- Nguồn xác nhận: stripe / manual / external
   paid_source     VARCHAR(40)     NULL,
-  payment_ref     VARCHAR(190)    NULL,       -- mã giao dịch ngân hàng
-  paid_amount_vnd BIGINT          NULL,       -- số tiền thực nhận
+  payment_ref     VARCHAR(190)    NULL,       -- mã giao dịch phía cổng thanh toán
+  paid_amount_usd_cents BIGINT    NULL,       -- số tiền thực nhận (cent)
   paid_at         DATETIME        NULL,
   -- Thời điểm đã GIAO HÀNG (cộng token / kích hoạt gói). Tách khỏi `status` để hệ
   -- thống ngoài chỉ cần đổi status = 'paid', server tự phát hiện và xử lý phần còn
@@ -201,6 +210,7 @@ CREATE TABLE IF NOT EXISTS orders (
   UNIQUE KEY uq_orders_code (code),
   KEY idx_orders_user (user_id, created_at),
   KEY idx_orders_status (status, created_at),
+  KEY idx_orders_stripe_session (stripe_session_id),
   CONSTRAINT fk_orders_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -279,15 +289,17 @@ CREATE TABLE IF NOT EXISTS generations (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ---------------------------------------------------------------------
--- 7. NHẬT KÝ WEBHOOK NGÂN HÀNG — chống cộng token trùng
+-- 7. NHẬT KÝ WEBHOOK CỔNG THANH TOÁN — chống cộng điểm trùng
 -- ---------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS payment_events (
   id             BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  provider       VARCHAR(40)     NOT NULL,   -- sepay | casso
-  external_id    VARCHAR(190)    NOT NULL,   -- id giao dịch phía cổng, dùng để chống trùng
+  provider       VARCHAR(40)     NOT NULL,   -- stripe
+  -- id sự kiện phía cổng (evt_...). Khoá duy nhất (provider, external_id) là thứ
+  -- chặn Stripe bắn lại cùng một sự kiện làm cộng điểm hai lần.
+  external_id    VARCHAR(190)    NOT NULL,
   order_code     VARCHAR(32)     NULL,
   order_id       BIGINT UNSIGNED NULL,
-  amount_vnd     BIGINT          NULL,
+  amount_usd_cents BIGINT        NULL,
   content        VARCHAR(500)    NULL,
   status         ENUM('matched','unmatched','duplicate','error') NOT NULL DEFAULT 'unmatched',
   message        VARCHAR(500)    NULL,
@@ -331,14 +343,15 @@ CREATE TABLE IF NOT EXISTS affiliate_commissions (
   referred_user_id  BIGINT UNSIGNED NOT NULL,   -- khách đã mua
   order_id          BIGINT UNSIGNED NOT NULL,
   order_code        VARCHAR(32)     NOT NULL,
-  revenue_vnd       BIGINT          NOT NULL,   -- số tiền khách thực trả
-  -- Giá vốn của số điểm đã giao. Quy ước toàn hệ thống: 1 điểm = 1đ giá vốn.
-  token_cost_vnd    BIGINT          NOT NULL,
+  revenue_usd_cents BIGINT          NOT NULL,   -- số tiền khách thực trả (cent)
+  -- Giá vốn của số điểm đã giao, tính bằng cent. Quy ước toàn hệ thống:
+  -- 1 điểm = 0,01 cent giá vốn nhà cung cấp (xem CREDIT_COST_USD trong env.ts).
+  token_cost_usd_cents BIGINT       NOT NULL,
   -- Chi phí cố định phân bổ cho đơn này (theo % doanh thu + số tiền cố định).
-  fixed_cost_vnd    BIGINT          NOT NULL DEFAULT 0,
-  profit_vnd        BIGINT          NOT NULL,   -- revenue − token_cost − fixed_cost
+  fixed_cost_usd_cents BIGINT       NOT NULL DEFAULT 0,
+  profit_usd_cents  BIGINT          NOT NULL,   -- revenue − token_cost − fixed_cost
   commission_percent DECIMAL(5,2)   NOT NULL,   -- tỉ lệ áp dụng lúc ghi nhận
-  commission_vnd    BIGINT          NOT NULL,   -- số tiền phải trả cho affiliate
+  commission_usd_cents BIGINT       NOT NULL,   -- số tiền phải trả cho affiliate
   status            ENUM('pending','paid','cancelled') NOT NULL DEFAULT 'pending',
   paid_at           DATETIME        NULL,
   paid_by           BIGINT UNSIGNED NULL,       -- admin đánh dấu đã chi trả

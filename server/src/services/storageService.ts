@@ -47,17 +47,17 @@ export async function saveBase64Image(input: string, fallbackMime = 'image/jpeg'
   const rawBase64 = match?.[2] ?? input.trim();
 
   const ext = MIME_EXT[mime];
-  if (!ext) throw badRequest(`Định dạng ảnh không được hỗ trợ: ${mime}`);
+  if (!ext) throw badRequest(`Unsupported image format: ${mime}`);
 
   let buffer: Buffer;
   try {
     buffer = Buffer.from(rawBase64, 'base64');
   } catch {
-    throw badRequest('Dữ liệu ảnh không hợp lệ.');
+    throw badRequest('That image file is not valid.');
   }
-  if (buffer.length === 0) throw badRequest('Dữ liệu ảnh rỗng.');
+  if (buffer.length === 0) throw badRequest('That image file is empty.');
   if (buffer.length > MAX_INPUT_BYTES) {
-    throw badRequest(`Ảnh quá lớn (${(buffer.length / 1024 / 1024).toFixed(1)}MB). Giới hạn 12MB mỗi ảnh.`);
+    throw badRequest(`Image too large (${(buffer.length / 1024 / 1024).toFixed(1)}MB). The limit is 12MB per image.`);
   }
 
   return writeFile(datedDir('inputs'), ext, buffer);
@@ -100,7 +100,7 @@ const EXT_MIME: Record<string, string> = {
  */
 export async function readAsDataUri(relPath: string): Promise<string> {
   const absPath = path.join(env.storageDir, relPath);
-  if (!absPath.startsWith(env.storageDir)) throw badRequest('Đường dẫn ảnh không hợp lệ.');
+  if (!absPath.startsWith(env.storageDir)) throw badRequest('Invalid image path.');
 
   const buffer = await fs.readFile(absPath);
   const ext = path.extname(absPath).replace('.', '').toLowerCase();

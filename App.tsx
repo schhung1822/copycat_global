@@ -5,7 +5,21 @@ import { PageLoader } from './components/ui';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { captureReferralFromUrl } from './lib/referral';
-import { APP_HOME } from './lib/routes';
+import {
+  ACCOUNT,
+  ADMIN,
+  AFFILIATE,
+  APP_HOME,
+  CREDITS,
+  FORGOT_PASSWORD,
+  HISTORY,
+  LEGACY_REDIRECTS,
+  LOGIN,
+  POLICY,
+  RESET_PASSWORD,
+  SIGNUP,
+  WALLET,
+} from './lib/routes';
 import { AccountPage } from './pages/AccountPage';
 import { AdminPage } from './pages/AdminPage';
 import { AffiliatePage } from './pages/AffiliatePage';
@@ -27,14 +41,14 @@ const RequireAuth: React.FC<{ children: React.ReactNode; adminOnly?: boolean; af
   const { user, isLoading, isAdmin, isAffiliate } = useAuth();
   const location = useLocation();
 
-  if (isLoading) return <PageLoader label="Đang kiểm tra phiên đăng nhập..." />;
+  if (isLoading) return <PageLoader label="Checking your session..." />;
 
   /*
    * Không còn ngoại lệ cho "/" như trước: trang chủ nay chính là trang giới
    * thiệu và ai cũng vào được, nên khách chưa đăng nhập không bao giờ chạm tới
    * đoạn này từ trang chủ nữa.
    */
-  if (!user) return <Navigate to="/dang-nhap" state={{ from: location.pathname }} replace />;
+  if (!user) return <Navigate to={LOGIN} state={{ from: location.pathname }} replace />;
 
   // Đã đăng nhập nhưng không phải quản trị viên: trả về bàn làm việc, không phải
   // trang bán hàng — họ là khách đang dùng dịch vụ chứ không phải người đi xem.
@@ -47,6 +61,18 @@ const RequireAuth: React.FC<{ children: React.ReactNode; adminOnly?: boolean; af
   return <>{children}</>;
 };
 
+/**
+ * Chuyển hướng giữ nguyên query string.
+ *
+ * `<Navigate to="/reset-password">` vứt mất phần `?token=…`, mà đó chính là thứ
+ * duy nhất làm cho link trong mail đặt lại mật khẩu có ý nghĩa — mọi mail đã gửi
+ * trước lần đổi đường dẫn này sẽ dẫn tới một trang báo "link không hợp lệ".
+ */
+const RedirectKeepingQuery: React.FC<{ to: string }> = ({ to }) => {
+  const { search, hash } = useLocation();
+  return <Navigate to={`${to}${search}${hash}`} replace />;
+};
+
 const AppRoutes: React.FC = () => (
   <Routes>
     {/*
@@ -57,16 +83,14 @@ const AppRoutes: React.FC = () => (
       nút "Vào tạo ảnh" trên thanh điều hướng.
     */}
     <Route path="/" element={<LandingPage />} />
-    {/* Đường dẫn cũ của trang giới thiệu — giữ lại cho link và bookmark đã phát ra */}
-    <Route path="/gioi-thieu" element={<Navigate to="/" replace />} />
 
-    <Route path="/dang-nhap" element={<LoginPage />} />
-    <Route path="/dang-ky" element={<RegisterPage />} />
+    <Route path={LOGIN} element={<LoginPage />} />
+    <Route path={SIGNUP} element={<RegisterPage />} />
     {/* Công khai: người quên mật khẩu thì đương nhiên chưa đăng nhập được */}
-    <Route path="/quen-mat-khau" element={<ForgotPasswordPage />} />
-    <Route path="/dat-lai-mat-khau" element={<ResetPasswordPage />} />
+    <Route path={FORGOT_PASSWORD} element={<ForgotPasswordPage />} />
+    <Route path={RESET_PASSWORD} element={<ResetPasswordPage />} />
     {/* Công khai: khách phải đọc được điều khoản trước khi tạo tài khoản */}
-    <Route path="/chinh-sach" element={<PolicyPage />} />
+    <Route path={POLICY} element={<PolicyPage />} />
 
     <Route
       element={
@@ -75,13 +99,13 @@ const AppRoutes: React.FC = () => (
         </RequireAuth>
       }
     >
-      <Route path="tao-anh" element={<StudioPage />} />
-      <Route path="lich-su" element={<HistoryPage />} />
-      <Route path="vi-diem" element={<WalletPage />} />
-      <Route path="nap-tien" element={<TopUpPage />} />
-      <Route path="tai-khoan" element={<AccountPage />} />
+      <Route path={APP_HOME} element={<StudioPage />} />
+      <Route path={HISTORY} element={<HistoryPage />} />
+      <Route path={WALLET} element={<WalletPage />} />
+      <Route path={CREDITS} element={<TopUpPage />} />
+      <Route path={ACCOUNT} element={<AccountPage />} />
       <Route
-        path="affiliate"
+        path={AFFILIATE}
         element={
           <RequireAuth affiliateOnly>
             <AffiliatePage />
@@ -89,7 +113,7 @@ const AppRoutes: React.FC = () => (
         }
       />
       <Route
-        path="quan-tri"
+        path={ADMIN}
         element={
           <RequireAuth adminOnly>
             <AdminPage />
@@ -97,6 +121,11 @@ const AppRoutes: React.FC = () => (
         }
       />
     </Route>
+
+    {/* Đường dẫn tiếng Việt đời trước — giữ cho link đã phát ra ngoài còn sống */}
+    {Object.entries(LEGACY_REDIRECTS).map(([from, to]) => (
+      <Route key={from} path={from} element={<RedirectKeepingQuery to={to} />} />
+    ))}
 
     <Route path="*" element={<Navigate to="/" replace />} />
   </Routes>

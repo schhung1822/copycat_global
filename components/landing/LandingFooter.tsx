@@ -1,34 +1,35 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { CREDITS, LOGIN, POLICY, SIGNUP, WALLET } from '../../lib/routes';
 import { LandingLogo } from './LandingLogo';
 
 /** Nhóm liên kết ở chân trang. Mục dùng thẻ <a> là neo trong trang. */
 const COLUMNS: { title: string; links: { label: string; to?: string; href?: string }[] }[] = [
   {
-    title: 'Sản phẩm',
+    title: 'Product',
     links: [
-      { label: 'Quy trình', href: '#quy-trinh' },
-      { label: 'Tính năng', href: '#tinh-nang' },
-      { label: 'Model AI', href: '#model' },
-      { label: 'Bảng giá', href: '#bang-gia' },
+      { label: 'How it works', href: '#how-it-works' },
+      { label: 'Features', href: '#features' },
+      { label: 'AI models', href: '#models' },
+      { label: 'Pricing', href: '#pricing' },
     ],
   },
   {
-    title: 'Tài khoản',
+    title: 'Account',
     links: [
-      { label: 'Đăng ký', to: '/dang-ky' },
-      { label: 'Đăng nhập', to: '/dang-nhap' },
-      { label: 'Mua điểm', to: '/nap-tien' },
-      { label: 'Ví điểm', to: '/vi-diem' },
+      { label: 'Sign up', to: SIGNUP },
+      { label: 'Sign in', to: LOGIN },
+      { label: 'Buy credits', to: CREDITS },
+      { label: 'Credit history', to: WALLET },
     ],
   },
   {
-    title: 'Hỗ trợ',
+    title: 'Support',
     links: [
-      { label: 'Câu hỏi thường gặp', href: '#cau-hoi' },
-      { label: 'Chính sách & Điều khoản', to: '/chinh-sach' },
-      { label: 'Hoàn điểm & hoàn tiền', to: '/chinh-sach#hoan-tra' },
-      { label: 'Liên hệ', to: '/chinh-sach#lien-he' },
+      { label: 'FAQ', href: '#faq' },
+      { label: 'Terms & Policies', to: POLICY },
+      { label: 'Refunds', to: `${POLICY}#refunds` },
+      { label: 'Contact', to: `${POLICY}#contact` },
     ],
   },
 ];
@@ -42,8 +43,8 @@ export const LandingFooter: React.FC = () => (
         <div>
           <LandingLogo />
           <p className="mt-4 max-w-sm text-sm leading-relaxed text-gray-500">
-            Công cụ dựng ảnh sản phẩm bằng AI cho người bán hàng Việt Nam: mượn bố cục của thiết kế đẹp, thay bằng sản
-            phẩm của chính bạn.
+            AI product imagery for people who sell online: borrow the layout of a design you love, and put your own
+            product in it.
           </p>
         </div>
 
@@ -72,9 +73,9 @@ export const LandingFooter: React.FC = () => (
       </div>
 
       <div className="mt-12 flex flex-col gap-3 border-t border-dark-800 pt-6 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-xs text-gray-600">© {new Date().getFullYear()}© Bản quyền thuộc về & cung cấp bởi Nextgency</p>
+        <p className="text-xs text-gray-600">© {new Date().getFullYear()} Nextgency. All rights reserved.</p>
         <p className="text-xs text-gray-600">
-          Ảnh do AI tạo ra — người dùng chịu trách nhiệm về nội dung mình tải lên và đăng tải.
+          Images are AI-generated — you are responsible for what you upload and publish.
         </p>
       </div>
     </div>

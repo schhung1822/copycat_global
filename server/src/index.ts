@@ -25,6 +25,16 @@ const app = express();
 app.disable('x-powered-by');
 app.set('trust proxy', 1);
 
+/*
+ * Webhook đứng TRƯỚC express.json() và trước attachUser.
+ *
+ * Trước attachUser vì cổng thanh toán xác thực bằng chữ ký riêng chứ không có
+ * phiên đăng nhập. Trước express.json() vì Stripe ký trên chuỗi byte gốc của
+ * request — parse thành object rồi dựng lại là chữ ký không còn khớp; router tự
+ * gắn `express.raw` cho riêng đường dẫn của mình.
+ */
+app.use('/api/webhooks', webhookRouter);
+
 // Ảnh gửi lên dưới dạng base64 nên body có thể khá lớn.
 app.use(express.json({ limit: '40mb' }));
 app.use(cookieParser());
@@ -32,9 +42,6 @@ app.use(cookieParser());
 app.get('/api/health', (_req, res) => {
   res.json({ ok: true, time: new Date().toISOString() });
 });
-
-// Webhook đứng trước attachUser: cổng thanh toán xác thực bằng header riêng.
-app.use('/api/webhooks', webhookRouter);
 
 app.use(attachUser);
 app.use('/api/auth', authRouter);
@@ -63,7 +70,7 @@ if (fs.existsSync(distDir)) {
 }
 
 app.use((req, res) => {
-  res.status(404).json({ error: `Không tìm thấy đường dẫn ${req.method} ${req.path}`, code: 'not_found' });
+  res.status(404).json({ error: `No route for ${req.method} ${req.path}`, code: 'not_found' });
 });
 
 app.use(errorHandler);

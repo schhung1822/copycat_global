@@ -9,7 +9,7 @@ export const Spinner: React.FC<{ className?: string }> = ({ className = 'h-5 w-5
   <span className={`inline-block border-2 border-current border-t-transparent rounded-full animate-spin ${className}`} />
 );
 
-export const PageLoader: React.FC<{ label?: string }> = ({ label = 'Đang tải...' }) => (
+export const PageLoader: React.FC<{ label?: string }> = ({ label = 'Loading…' }) => (
   <div className="flex flex-col items-center justify-center py-24 text-gray-500 gap-3">
     <Spinner className="h-8 w-8 text-brand-500" />
     <span className="text-sm">{label}</span>

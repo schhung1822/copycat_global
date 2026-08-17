@@ -121,7 +121,7 @@ export async function requestPasswordReset(identifier: string, requestIp: string
       [account.id, hashToken(token), env.passwordResetMinutes, requestIp],
     );
 
-    const link = `${env.appUrl.replace(/\/+$/, '')}/dat-lai-mat-khau?token=${encodeURIComponent(token)}`;
+    const link = `${env.appUrl.replace(/\/+$/, '')}/reset-password?token=${encodeURIComponent(token)}`;
     const mail = buildPasswordResetMail({
       name: account.full_name,
       link,
@@ -158,15 +158,15 @@ export async function resetPassword(token: string, newPassword: string): Promise
     [hashToken(token)],
   );
 
-  if (!row) throw badRequest('Liên kết không hợp lệ. Hãy yêu cầu gửi lại liên kết mới.', 'invalid_token');
-  if (row.used_at) throw badRequest('Liên kết này đã được dùng rồi. Hãy yêu cầu gửi lại liên kết mới.', 'used_token');
+  if (!row) throw badRequest('This link is not valid. Please request a new one.', 'invalid_token');
+  if (row.used_at) throw badRequest('This link has already been used. Please request a new one.', 'used_token');
   if (new Date(row.expires_at).getTime() <= Date.now()) {
-    throw badRequest('Liên kết đã hết hạn. Hãy yêu cầu gửi lại liên kết mới.', 'expired_token');
+    throw badRequest('This link has expired. Please request a new one.', 'expired_token');
   }
 
   const user = await queryOne<UserRow>('SELECT id, email, full_name, status FROM users WHERE id = ?', [row.user_id]);
-  if (!user) throw badRequest('Không tìm thấy tài khoản.', 'invalid_token');
-  if (user.status === 'banned') throw badRequest('Tài khoản của bạn đã bị khoá.', 'account_banned');
+  if (!user) throw badRequest('Account not found.', 'invalid_token');
+  if (user.status === 'banned') throw badRequest('Your account has been suspended.', 'account_banned');
 
   await execute('UPDATE users SET password_hash = ? WHERE id = ?', [await hashPassword(newPassword), user.id]);
 

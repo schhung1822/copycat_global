@@ -2,14 +2,21 @@ import React, { useEffect, useState } from 'react';
 import { BarChart, CHART_COLORS } from '../../components/BarChart';
 import { Alert, Card, PageLoader, StatCard, TableWrap } from '../../components/ui';
 import { api } from '../../lib/api';
-import { formatNumber, formatVnd } from '../../lib/format';
+import { formatNumberVi, formatUsd } from '../../lib/format';
 import type { AdminOverview, DailyPoint, ModelReport } from '../../types';
 
 /** Rút gọn số tiền lớn cho trục dọc: 1.200.000đ -> 1,2tr */
-const compactVnd = (value: number): string => {
-  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(value >= 10_000_000 ? 0 : 1)}tr`;
-  if (value >= 1_000) return `${Math.round(value / 1_000)}k`;
-  return String(Math.round(value));
+/**
+ * Nhãn tiền rút gọn cho trục biểu đồ. Nhận vào CENT, in ra đô-la.
+ *
+ * Trục dọc chỉ rộng chừng 40px nên "$12,345.00" đè lên nhau; rút về "$12.3k"
+ * vẫn đọc được đúng độ lớn, còn con số chính xác nằm ở tooltip và các ô thống kê.
+ */
+const compactUsd = (cents: number): string => {
+  const dollars = cents / 100;
+  if (dollars >= 1_000_000) return `$${(dollars / 1_000_000).toFixed(dollars >= 10_000_000 ? 0 : 1)}M`;
+  if (dollars >= 1_000) return `$${(dollars / 1_000).toFixed(dollars >= 10_000 ? 0 : 1)}k`;
+  return `$${Math.round(dollars)}`;
 };
 
 export const OverviewTab: React.FC = () => {
@@ -35,7 +42,7 @@ export const OverviewTab: React.FC = () => {
     void api.get<{ series: DailyPoint[] }>(`/admin/reports/daily?days=${days}`).then((data) => setDaily(data.series));
   }, [days]);
 
-  if (!overview) return <PageLoader />;
+  if (!overview) return <PageLoader label="Đang tải..." />;
 
   const labels = daily.map((point) => point.day.slice(5).replace('-', '/'));
   const unconfiguredProviders = overview.system.providers.filter((provider) => !provider.configured);
@@ -53,24 +60,24 @@ export const OverviewTab: React.FC = () => {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           label="Doanh thu hôm nay"
-          value={formatVnd(overview.revenue.today)}
-          sub={`7 ngày: ${formatVnd(overview.revenue.last7Days)}`}
+          value={formatUsd(overview.revenue.today)}
+          sub={`7 ngày: ${formatUsd(overview.revenue.last7Days)}`}
         />
         <StatCard
           label="Doanh thu 30 ngày"
-          value={formatVnd(overview.revenue.last30Days)}
-          sub={`Tổng: ${formatVnd(overview.revenue.total)}`}
+          value={formatUsd(overview.revenue.last30Days)}
+          sub={`Tổng: ${formatUsd(overview.revenue.total)}`}
         />
         <StatCard
           label="Lợi nhuận gộp"
-          value={formatVnd(overview.cost.grossProfitVnd)}
-          sub={`Biên ${overview.cost.grossMarginPercent}% · vốn ${formatVnd(overview.cost.apiCostVnd)}`}
-          tone={overview.cost.grossProfitVnd >= 0 ? 'positive' : 'negative'}
+          value={formatUsd(overview.cost.grossProfitUsdCents)}
+          sub={`Biên ${overview.cost.grossMarginPercent}% · vốn ${formatUsd(overview.cost.apiCostUsdCents)}`}
+          tone={overview.cost.grossProfitUsdCents >= 0 ? 'positive' : 'negative'}
         />
         <StatCard
           label="Đơn chờ thanh toán"
-          value={formatNumber(overview.revenue.pendingOrders)}
-          sub={`${formatNumber(overview.revenue.paidOrders)} đơn đã thanh toán`}
+          value={formatNumberVi(overview.revenue.pendingOrders)}
+          sub={`${formatNumberVi(overview.revenue.paidOrders)} đơn đã thanh toán`}
           tone={overview.revenue.pendingOrders > 0 ? 'warning' : 'default'}
         />
       </div>
@@ -84,25 +91,25 @@ export const OverviewTab: React.FC = () => {
         */}
         <StatCard
           label="Gói tháng còn hạn"
-          value={formatNumber(overview.subscribers.active)}
+          value={formatNumberVi(overview.subscribers.active)}
           sub={`đã ngừng bán · ${overview.subscribers.expiringIn7Days} hết hạn trong 7 ngày`}
           tone={overview.subscribers.expiringIn7Days > 0 ? 'warning' : 'positive'}
         />
         <StatCard
           label="Doanh thu bán điểm"
-          value={formatVnd(overview.revenue.extraTokenRevenue)}
+          value={formatUsd(overview.revenue.extraTokenRevenue)}
           sub={`${Math.round(
             (overview.revenue.extraTokenRevenue / Math.max(overview.revenue.total, 1)) * 100,
           )}% tổng doanh thu`}
         />
         <StatCard
           label="Doanh thu gói tháng"
-          value={formatVnd(overview.revenue.subscriptionRevenue)}
+          value={formatUsd(overview.revenue.subscriptionRevenue)}
           sub="di sản, không còn phát sinh mới"
         />
         <StatCard
           label="Hạn mức chưa dùng"
-          value={formatNumber(overview.subscribers.monthlyTokensRemaining)}
+          value={formatNumberVi(overview.subscribers.monthlyTokensRemaining)}
           sub="điểm của gói cũ, mất khi sang chu kỳ mới"
         />
       </div>
@@ -114,21 +121,21 @@ export const OverviewTab: React.FC = () => {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           label="Điểm đã bán"
-          value={formatNumber(overview.tokens.sold)}
-          sub={`qua ${formatNumber(overview.revenue.paidOrders)} đơn đã thanh toán`}
+          value={formatNumberVi(overview.tokens.sold)}
+          sub={`qua ${formatNumberVi(overview.revenue.paidOrders)} đơn đã thanh toán`}
         />
         <StatCard
           label="Điểm khách đã dùng"
-          value={formatNumber(overview.tokens.used)}
+          value={formatNumberVi(overview.tokens.used)}
           sub={
-            `${formatNumber(overview.tokens.usedToday)} hôm nay · ` +
-            `${formatNumber(overview.tokens.usedLast30Days)} trong 30 ngày`
+            `${formatNumberVi(overview.tokens.usedToday)} hôm nay · ` +
+            `${formatNumberVi(overview.tokens.usedLast30Days)} trong 30 ngày`
           }
           tone="positive"
         />
         <StatCard
           label="Đã hoàn vì ảnh lỗi"
-          value={formatNumber(overview.tokens.refunded)}
+          value={formatNumberVi(overview.tokens.refunded)}
           sub={
             overview.tokens.used + overview.tokens.refunded > 0
               ? `${
@@ -142,8 +149,8 @@ export const OverviewTab: React.FC = () => {
         />
         <StatCard
           label="Điểm chưa dùng"
-          value={formatNumber(overview.users.outstandingTokens)}
-          sub={`Khách đã trả ~${formatVnd(overview.users.outstandingLiabilityVnd)} cho số này`}
+          value={formatNumberVi(overview.users.outstandingTokens)}
+          sub={`Khách đã trả ~${formatUsd(overview.users.outstandingLiabilityUsdCents)} cho số này`}
           tone="warning"
         />
       </div>
@@ -151,22 +158,22 @@ export const OverviewTab: React.FC = () => {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           label="Khách hàng"
-          value={formatNumber(overview.users.total)}
+          value={formatNumberVi(overview.users.total)}
           sub={`+${overview.users.newToday} hôm nay · +${overview.users.new30Days} trong 30 ngày`}
         />
         <StatCard
           label="Ảnh đã tạo"
-          value={formatNumber(overview.generations.total)}
+          value={formatNumberVi(overview.generations.total)}
           sub={`${overview.generations.today} hôm nay · tỉ lệ thành công ${overview.generations.successRate}%`}
         />
         <StatCard
           label="Điểm trung bình mỗi ảnh"
           value={
             overview.generations.success > 0
-              ? formatNumber(Math.round(overview.tokens.used / overview.generations.success))
+              ? formatNumberVi(Math.round(overview.tokens.used / overview.generations.success))
               : '—'
           }
-          sub={`trên ${formatNumber(overview.generations.success)} ảnh thành công`}
+          sub={`trên ${formatNumberVi(overview.generations.success)} ảnh thành công`}
         />
         <StatCard
           label="Hàng đợi"
@@ -199,19 +206,19 @@ export const OverviewTab: React.FC = () => {
 
         <BarChart
           labels={labels}
-          format={compactVnd}
+          format={compactUsd}
           series={[
             {
               key: 'revenue',
               label: 'Doanh thu',
               color: CHART_COLORS.primary,
-              values: daily.map((point) => point.revenueVnd),
+              values: daily.map((point) => point.revenueUsdCents),
             },
             {
               key: 'cost',
               label: 'Chi phí API',
               color: CHART_COLORS.secondary,
-              values: daily.map((point) => point.apiCostVnd),
+              values: daily.map((point) => point.apiCostUsdCents),
             },
           ]}
         />
@@ -222,7 +229,7 @@ export const OverviewTab: React.FC = () => {
           <h2 className="font-bold text-gray-100 mb-4">Số ảnh tạo mỗi ngày</h2>
           <BarChart
             labels={labels}
-            format={(value) => formatNumber(Math.round(value))}
+            format={(value) => formatNumberVi(Math.round(value))}
             height={160}
             series={[
               {
@@ -243,7 +250,7 @@ export const OverviewTab: React.FC = () => {
           */}
           <BarChart
             labels={labels}
-            format={(value) => compactVnd(value)}
+            format={(value) => compactUsd(value)}
             height={160}
             series={[
               {
@@ -260,7 +267,7 @@ export const OverviewTab: React.FC = () => {
           <h2 className="font-bold text-gray-100 mb-4">Khách đăng ký mới mỗi ngày</h2>
           <BarChart
             labels={labels}
-            format={(value) => formatNumber(Math.round(value))}
+            format={(value) => formatNumberVi(Math.round(value))}
             height={160}
             series={[
               {
@@ -300,10 +307,10 @@ export const OverviewTab: React.FC = () => {
                   <tr key={model.modelCode} className="border-b border-dark-850 last:border-0">
                     <td className="py-2.5 text-gray-300">{model.modelLabel}</td>
                     <td className="py-2.5 text-right text-gray-400">
-                      {formatNumber(model.success)}/{formatNumber(model.total)}
+                      {formatNumberVi(model.success)}/{formatNumberVi(model.total)}
                     </td>
-                    <td className="py-2.5 text-right text-gray-300">{formatVnd(model.tokenValueVnd)}</td>
-                    <td className="py-2.5 text-right text-gray-500">{formatVnd(model.apiCostVnd)}</td>
+                    <td className="py-2.5 text-right text-gray-300">{formatUsd(model.tokenValueUsdCents)}</td>
+                    <td className="py-2.5 text-right text-gray-500">{formatUsd(model.apiCostUsdCents)}</td>
                     <td
                       className={`py-2.5 text-right font-semibold ${
                         model.marginPercent >= 50 ? 'text-green-400' : 'text-amber-400'
@@ -341,10 +348,10 @@ export const OverviewTab: React.FC = () => {
                 topUsers.map((user) => (
                   <tr key={user.id} className="border-b border-dark-850 last:border-0">
                     <td className="py-2.5 text-gray-300 truncate max-w-[200px]">{user.fullName || user.email}</td>
-                    <td className="py-2.5 text-right text-gray-300">{formatVnd(user.totalTopupVnd)}</td>
-                    <td className="py-2.5 text-right text-gray-300">{formatNumber(user.tokensSpent)}</td>
-                    <td className="py-2.5 text-right text-brand-500">{formatNumber(user.tokenBalance)}</td>
-                    <td className="py-2.5 text-right text-gray-500">{formatNumber(user.images)}</td>
+                    <td className="py-2.5 text-right text-gray-300">{formatUsd(user.totalTopupUsdCents)}</td>
+                    <td className="py-2.5 text-right text-gray-300">{formatNumberVi(user.tokensSpent)}</td>
+                    <td className="py-2.5 text-right text-brand-500">{formatNumberVi(user.tokenBalance)}</td>
+                    <td className="py-2.5 text-right text-gray-500">{formatNumberVi(user.images)}</td>
                   </tr>
                 ))
               )}
@@ -361,8 +368,8 @@ export const OverviewTab: React.FC = () => {
             <p className="text-gray-300 mt-1 break-all">{overview.system.adminEmails.join(', ') || '—'}</p>
           </div>
           <div>
-            <p className="text-[11px] uppercase tracking-wider text-gray-500 font-bold">Tỉ giá quy đổi</p>
-            <p className="text-gray-300 mt-1">1 USD = {formatVnd(overview.cost.usdToVnd)}</p>
+            <p className="text-[11px] uppercase tracking-wider text-gray-500 font-bold">Quy ước điểm</p>
+            <p className="text-gray-300 mt-1">{formatNumberVi(overview.cost.creditsPerUsd)} điểm = $1 giá vốn</p>
           </div>
           <div>
             <p className="text-[11px] uppercase tracking-wider text-gray-500 font-bold">Lưu ảnh về server</p>

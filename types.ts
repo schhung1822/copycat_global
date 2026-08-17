@@ -66,22 +66,16 @@ export interface TokenPackage {
   id: number;
   code: string;
   name: string;
-  priceVnd: number;
+  /** Giá bán, tính bằng USD cent — trùng đúng đơn vị Stripe nhận. */
+  priceUsdCents: number;
   baseTokens: number;
   bonusTokens: number;
   totalTokens: number;
-  pricePerToken: number;
+  /** Đơn giá mỗi điểm tính bằng cent (số rất nhỏ, giữ 4 chữ số thập phân). */
+  pricePerTokenCents: number;
   bonusPercent: number;
   description: string | null;
   isPopular: boolean;
-}
-
-export interface BankInfo {
-  bankCode: string;
-  bankName: string;
-  accountNumber: string;
-  accountName: string;
-  configured: boolean;
 }
 
 export interface SiteInfo {
@@ -97,7 +91,6 @@ export interface SiteInfo {
 export interface Catalog {
   models: ModelOption[];
   packages: TokenPackage[];
-  bank: BankInfo;
   site: SiteInfo;
 }
 
@@ -130,22 +123,22 @@ export interface Order {
   orderType: 'subscription' | 'token_package';
   subscriptionMonths: number | null;
   isUpgrade: boolean;
-  /** Nâng gói: số tiền được khấu trừ từ phần chưa dùng của gói cũ */
-  creditVnd: number;
+  /** Nâng gói: số tiền được khấu trừ từ phần chưa dùng của gói cũ (cent) */
+  creditUsdCents: number;
   packageName: string;
-  amountVnd: number;
+  amountUsdCents: number;
   baseTokens: number;
   bonusTokens: number;
   totalTokens: number;
   status: OrderStatus;
+  /** stripe | manual — cách đơn được thanh toán */
+  paymentMethod: string;
   paidSource: string | null;
   paymentRef: string | null;
   paidAt: string | null;
   expiresAt: string | null;
   createdAt: string;
   note: string | null;
-  qrUrl: string | null;
-  transferContent: string;
 }
 
 export interface TokenTransaction {
@@ -169,7 +162,7 @@ export interface WalletSummary {
   isSubscribed: boolean;
   subscriptionExpiresAt: string | null;
   subscriptionName: string | null;
-  totalTopupVnd: number;
+  totalTopupUsdCents: number;
   totalTokensIn: number;
   totalTokensOut: number;
   totalImages: number;
@@ -202,7 +195,7 @@ export interface AdminOverview {
     newToday: number;
     new30Days: number;
     outstandingTokens: number;
-    outstandingLiabilityVnd: number;
+    outstandingLiabilityUsdCents: number;
   };
   tokens: {
     /** Điểm đã bán ra qua các đơn đã thanh toán */
@@ -226,10 +219,11 @@ export interface AdminOverview {
   };
   cost: {
     apiCostUsd: number;
-    apiCostVnd: number;
-    grossProfitVnd: number;
+    apiCostUsdCents: number;
+    grossProfitUsdCents: number;
     grossMarginPercent: number;
-    usdToVnd: number;
+    /** Số điểm quy ra $1 giá vốn nhà cung cấp (mặc định 10.000) */
+    creditsPerUsd: number;
   };
   system: {
     /** `users` = số khách đang có ảnh chạy, để biết trần chung có bị một người chiếm hết không */
@@ -242,13 +236,13 @@ export interface AdminOverview {
 
 export interface DailyPoint {
   day: string;
-  revenueVnd: number;
+  revenueUsdCents: number;
   orders: number;
   newUsers: number;
   images: number;
   successImages: number;
   tokensSpent: number;
-  apiCostVnd: number;
+  apiCostUsdCents: number;
 }
 
 export interface AdminUser {
@@ -274,7 +268,7 @@ export interface AdminUser {
   subscriptionExpiresAt: string | null;
   /** Tên gói của thuê bao gần nhất, null nếu chưa mua gói nào */
   planName: string | null;
-  totalTopupVnd: number;
+  totalTopupUsdCents: number;
   tokensIn: number;
   tokensOut: number;
   lastLoginAt: string | null;
@@ -294,9 +288,9 @@ export interface AdminModelPricing {
   family: string;
   resolution: string;
   apiCostUsd: number;
-  apiCostVnd: number;
+  apiCostUsdCents: number;
   tokenCost: number;
-  sellPriceVnd: number;
+  sellPriceUsdCents: number;
   marginPercent: number;
   isActive: boolean;
   /** Model làm mốc quy số điểm ra số ảnh trên thẻ gói điểm — chỉ một model được bật */
@@ -310,12 +304,12 @@ export interface AdminPlan {
   code: string;
   name: string;
   months: number;
-  priceVnd: number;
-  pricePerMonthVnd: number;
+  priceUsdCents: number;
+  pricePerMonthUsdCents: number;
   /** 0 = gói không tặng điểm hàng tháng (gói miễn phí), khách chỉ dùng điểm mua thêm */
   monthlyTokenAllowance: number;
-  /** Hạn mức quy ra tiền vốn — 1 điểm = 1đ giá vốn */
-  allowanceCostVnd: number;
+  /** Hạn mức quy ra tiền vốn, tính bằng cent */
+  allowanceCostUsdCents: number;
   description: string | null;
   isPopular: boolean;
   /** Tắt = không bán trên trang bảng giá, nhưng admin vẫn cấp tay được */
@@ -327,11 +321,11 @@ export interface AdminPackage {
   id: number;
   code: string;
   name: string;
-  priceVnd: number;
+  priceUsdCents: number;
   baseTokens: number;
   bonusTokens: number;
   totalTokens: number;
-  pricePerToken: number;
+  pricePerTokenCents: number;
   description: string | null;
   isPopular: boolean;
   isActive: boolean;
@@ -345,8 +339,8 @@ export interface ModelReport {
   total: number;
   success: number;
   tokensSpent: number;
-  tokenValueVnd: number;
-  apiCostVnd: number;
+  tokenValueUsdCents: number;
+  apiCostUsdCents: number;
   marginPercent: number;
 }
 
@@ -367,12 +361,12 @@ export type CommissionStatus = 'pending' | 'paid' | 'cancelled';
 export interface AffiliateCommission {
   id: number;
   orderCode: string;
-  revenueVnd: number;
-  tokenCostVnd: number;
-  fixedCostVnd: number;
-  profitVnd: number;
+  revenueUsdCents: number;
+  tokenCostUsdCents: number;
+  fixedCostUsdCents: number;
+  profitUsdCents: number;
   commissionPercent: number;
-  commissionVnd: number;
+  commissionUsdCents: number;
   status: CommissionStatus;
   paidAt: string | null;
   note: string | null;
@@ -385,13 +379,13 @@ export interface AffiliateStats {
   referrals: number;
   payingReferrals: number;
   orders: number;
-  revenueVnd: number;
-  profitVnd: number;
-  commissionVnd: number;
-  pendingVnd: number;
-  /** Số khoản đang chờ — đơn không có lãi cho hoa hồng 0đ nên tiền và số lượng không suy ra nhau. */
+  revenueUsdCents: number;
+  profitUsdCents: number;
+  commissionUsdCents: number;
+  pendingUsdCents: number;
+  /** Số khoản đang chờ — đơn không có lãi cho hoa hồng $0 nên tiền và số lượng không suy ra nhau. */
   pendingCount: number;
-  paidVnd: number;
+  paidUsdCents: number;
 }
 
 export interface AffiliateSummary {
@@ -408,15 +402,15 @@ export interface AffiliateReferral {
   id: number;
   customer: string;
   joinedAt: string;
-  revenueVnd: number;
-  commissionVnd: number;
+  revenueUsdCents: number;
+  commissionUsdCents: number;
 }
 
 export interface AffiliateSettings {
   enabled: boolean;
   commissionPercent: number;
-  /** Chi phí cố định trừ thẳng mỗi đơn (phí cổng thanh toán, phí xử lý...) */
-  fixedCostVnd: number;
+  /** Chi phí cố định trừ thẳng mỗi đơn, tính bằng cent (phí Stripe, phí xử lý...) */
+  fixedCostUsdCents: number;
   /** Chi phí cố định phân bổ theo % doanh thu (hạ tầng, nhân sự, marketing...) */
   fixedCostPercent: number;
 }
@@ -425,12 +419,12 @@ export interface AffiliateSettings {
 export interface AffiliateExample {
   packageName: string;
   tokens: number;
-  revenueVnd: number;
-  tokenCostVnd: number;
-  fixedCostVnd: number;
-  profitVnd: number;
+  revenueUsdCents: number;
+  tokenCostUsdCents: number;
+  fixedCostUsdCents: number;
+  profitUsdCents: number;
   commissionPercent: number;
-  commissionVnd: number;
+  commissionUsdCents: number;
 }
 
 export interface AdminAffiliate {
@@ -449,6 +443,6 @@ export interface AdminCommission extends Omit<AffiliateCommission, 'customer'> {
   customer: { id: number; email: string };
 }
 
-// Tab "Webhook ngân hàng" đã bỏ khỏi bảng điều khiển nên không còn kiểu PaymentEvent
-// ở frontend. Webhook vẫn chạy và vẫn ghi bảng `payment_events`; khi cần tra cứu một
-// giao dịch thất lạc thì gọi thẳng `GET /api/admin/payment-events` (xem README mục 6).
+// Tab "Webhook" đã bỏ khỏi bảng điều khiển nên không còn kiểu PaymentEvent ở
+// frontend. Webhook Stripe vẫn chạy và vẫn ghi bảng `payment_events`; khi cần tra
+// một giao dịch thất lạc thì gọi thẳng `GET /api/admin/payment-events` (xem README).

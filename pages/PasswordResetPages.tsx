@@ -5,7 +5,7 @@ import { PasswordInput } from '../components/PasswordInput';
 import { Alert, Field, inputClass, PageLoader } from '../components/ui';
 import { useAuth } from '../context/AuthContext';
 import { api, ApiError } from '../lib/api';
-import { APP_HOME } from '../lib/routes';
+import { APP_HOME, FORGOT_PASSWORD, LOGIN } from '../lib/routes';
 import { AuthShell } from './AuthPages';
 
 /**
@@ -35,7 +35,7 @@ export const ForgotPasswordPage: React.FC = () => {
       await api.post('/auth/forgot-password', { identifier });
       setIsSent(true);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Không gửi được yêu cầu. Vui lòng thử lại.');
+      setError(err instanceof ApiError ? err.message : 'Could not send the request. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -43,13 +43,13 @@ export const ForgotPasswordPage: React.FC = () => {
 
   return (
     <AuthShell
-      title="Quên mật khẩu"
-      subtitle="Nhập email hoặc số điện thoại bạn đã dùng để đăng ký."
+      title="Forgot your password?"
+      subtitle="Enter the email or phone number you signed up with."
       footer={
         <>
-          Nhớ ra mật khẩu rồi?{' '}
-          <Link to="/dang-nhap" className="font-semibold text-brand-500 hover:underline">
-            Quay lại đăng nhập
+          Remembered it?{' '}
+          <Link to={LOGIN} className="font-semibold text-brand-500 hover:underline">
+            Back to sign in
           </Link>
         </>
       }
@@ -57,18 +57,18 @@ export const ForgotPasswordPage: React.FC = () => {
       {isSent ? (
         <div className="space-y-4">
           <Alert tone="success">
-            Nếu thông tin bạn nhập khớp với một tài khoản, chúng tôi đã gửi liên kết đặt lại mật khẩu tới email của tài
-            khoản đó. Liên kết có hiệu lực trong 15 phút.
+            If that matches an account, we have emailed a reset link to the address on file. The link is valid for 15
+            minutes.
           </Alert>
 
           <p className="text-sm leading-relaxed text-gray-500">
-            Chưa thấy mail? Kiểm tra thêm mục Spam / Quảng cáo. Bạn cũng có thể{' '}
+            Nothing in your inbox? Check the Spam and Promotions folders. You can also{' '}
             <button
               type="button"
               onClick={() => setIsSent(false)}
               className="font-semibold text-brand-500 hover:underline"
             >
-              thử lại với thông tin khác
+              try different details
             </button>
             .
           </p>
@@ -77,20 +77,20 @@ export const ForgotPasswordPage: React.FC = () => {
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && <Alert tone="error">{error}</Alert>}
 
-          <Field label="Email hoặc số điện thoại" hint="Nhập đúng thông tin đã dùng khi tạo tài khoản.">
+          <Field label="Email or phone number" hint="Use the same details you signed up with.">
             <input
               type="text"
               className={inputClass}
               value={identifier}
               onChange={(event) => setIdentifier(event.target.value)}
-              placeholder="example@gmail.com hoặc 0900000000"
+              placeholder="you@example.com or +1 555 000 0000"
               autoComplete="username"
               required
             />
           </Field>
 
           <Button type="submit" isLoading={isSubmitting} className="w-full !rounded-xl">
-            Gửi liên kết đặt lại
+            Send reset link
           </Button>
         </form>
       )}
@@ -147,17 +147,17 @@ export const ResetPasswordPage: React.FC = () => {
     event.preventDefault();
     setError(null);
 
-    if (password.length < 6) return setError('Mật khẩu phải có ít nhất 6 ký tự.');
-    if (password !== confirm) return setError('Hai mật khẩu không khớp nhau.');
+    if (password.length < 6) return setError('Password must be at least 6 characters.');
+    if (password !== confirm) return setError('The two passwords do not match.');
 
     setIsSubmitting(true);
     try {
       await api.post('/auth/reset-password', { token, password });
       setIsDone(true);
       // Chờ một nhịp cho người dùng đọc kịp thông báo rồi mới chuyển trang.
-      setTimeout(() => navigate('/dang-nhap', { replace: true }), 2500);
+      setTimeout(() => navigate(LOGIN, { replace: true }), 2500);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Không đặt lại được mật khẩu.');
+      setError(err instanceof ApiError ? err.message : 'Could not reset your password.');
     } finally {
       setIsSubmitting(false);
     }
@@ -165,47 +165,47 @@ export const ResetPasswordPage: React.FC = () => {
 
   const footer = (
     <>
-      Cần liên kết mới?{' '}
-      <Link to="/quen-mat-khau" className="font-semibold text-brand-500 hover:underline">
-        Gửi lại
+      Need a new link?{' '}
+      <Link to={FORGOT_PASSWORD} className="font-semibold text-brand-500 hover:underline">
+        Send another
       </Link>
     </>
   );
 
   if (isChecking) {
     return (
-      <AuthShell title="Đặt lại mật khẩu" subtitle="Đang kiểm tra liên kết..." footer={footer}>
-        <PageLoader label="Đang kiểm tra liên kết..." />
+      <AuthShell title="Reset your password" subtitle="Checking your link…" footer={footer}>
+        <PageLoader label="Checking your link…" />
       </AuthShell>
     );
   }
 
   if (!token || !isValid) {
     return (
-      <AuthShell title="Liên kết không dùng được" subtitle="Liên kết đã hết hạn hoặc đã được dùng." footer={footer}>
+      <AuthShell title="This link no longer works" subtitle="It has expired or has already been used." footer={footer}>
         <Alert tone="error">
-          Liên kết đặt lại mật khẩu chỉ dùng được một lần và hết hạn sau 15 phút. Hãy yêu cầu gửi lại một liên kết mới.
+          Password reset links work once and expire after 15 minutes. Request a fresh one to continue.
         </Alert>
 
         <Link
-          to="/quen-mat-khau"
+          to={FORGOT_PASSWORD}
           className="mt-4 block rounded-xl bg-brand-500 px-4 py-2.5 text-center text-sm font-bold text-white transition-colors hover:bg-brand-600"
         >
-          Yêu cầu liên kết mới
+          Request a new link
         </Link>
       </AuthShell>
     );
   }
 
   return (
-    <AuthShell title="Đặt lại mật khẩu" subtitle="Chọn mật khẩu mới cho tài khoản của bạn." footer={footer}>
+    <AuthShell title="Reset your password" subtitle="Choose a new password for your account." footer={footer}>
       {isDone ? (
-        <Alert tone="success">Đã đổi mật khẩu thành công. Đang chuyển tới trang đăng nhập...</Alert>
+        <Alert tone="success">Password changed. Taking you to the sign-in page…</Alert>
       ) : (
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && <Alert tone="error">{error}</Alert>}
 
-          <Field label="Mật khẩu mới" hint="Tối thiểu 6 ký tự.">
+          <Field label="New password" hint="At least 6 characters.">
             <PasswordInput
               value={password}
               onChange={(event) => setPassword(event.target.value)}
@@ -214,7 +214,7 @@ export const ResetPasswordPage: React.FC = () => {
             />
           </Field>
 
-          <Field label="Nhập lại mật khẩu mới">
+          <Field label="Confirm new password">
             <PasswordInput
               value={confirm}
               onChange={(event) => setConfirm(event.target.value)}
@@ -224,7 +224,7 @@ export const ResetPasswordPage: React.FC = () => {
           </Field>
 
           <Button type="submit" isLoading={isSubmitting} className="w-full !rounded-xl">
-            Đổi mật khẩu
+            Change password
           </Button>
         </form>
       )}

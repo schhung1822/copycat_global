@@ -5,10 +5,10 @@ import { formatDateTime, STATUS_LABEL } from '../lib/format';
 import type { Generation } from '../types';
 
 const FILTERS = [
-  { value: '', label: 'Tất cả' },
-  { value: 'success', label: 'Hoàn tất' },
-  { value: 'processing', label: 'Đang vẽ' },
-  { value: 'refunded', label: 'Lỗi' },
+  { value: '', label: 'All' },
+  { value: 'success', label: 'Done' },
+  { value: 'processing', label: 'Generating' },
+  { value: 'refunded', label: 'Failed' },
 ];
 
 const PAGE_SIZE = 24;
@@ -54,7 +54,7 @@ export const HistoryPage: React.FC = () => {
    * thấy một trang trống trong khi vẫn còn ảnh ở các trang trước đó.
    */
   const handleDelete = async (item: Generation) => {
-    if (!confirm('Xoá ảnh này khỏi lịch sử? Điểm đã dùng để tạo ảnh sẽ không được hoàn lại.')) return;
+    if (!confirm('Remove this image from your history? The credits it cost will not be refunded.')) return;
 
     setDeletingId(item.id);
     setError(null);
@@ -65,7 +65,7 @@ export const HistoryPage: React.FC = () => {
       setTotal((current) => Math.max(current - 1, 0));
       if (remaining.length === 0 && page > 1) setPage(page - 1);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Không xoá được ảnh.');
+      setError(err instanceof Error ? err.message : 'Could not delete this image.');
     } finally {
       setDeletingId(null);
     }
@@ -75,8 +75,8 @@ export const HistoryPage: React.FC = () => {
     <div className="max-w-7xl mx-auto p-6 space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-100">Lịch sử thiết kế</h1>
-          <p className="text-sm text-gray-500 mt-1">{total} ảnh đã tạo</p>
+          <h1 className="text-2xl font-bold text-gray-100">Your designs</h1>
+          <p className="text-sm text-gray-500 mt-1">{total} images generated</p>
         </div>
 
         <div className="flex gap-1.5">
@@ -103,7 +103,7 @@ export const HistoryPage: React.FC = () => {
         <PageLoader />
       ) : generations.length === 0 ? (
         <Card className="p-6">
-          <EmptyState title="Không có ảnh nào." hint="Hãy tạo thiết kế đầu tiên ở trang Tạo ảnh." />
+          <EmptyState title="No images yet." hint="Head to the Studio to create your first design." />
         </Card>
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
@@ -113,7 +113,7 @@ export const HistoryPage: React.FC = () => {
                 {item.imageUrl && item.status === 'success' ? (
                   <img
                     src={item.imageUrl}
-                    alt="Thiết kế"
+                    alt="Generated design"
                     className="w-full h-full object-cover cursor-zoom-in"
                     onClick={() => setPreviewUrl(item.imageUrl)}
                   />
@@ -140,8 +140,8 @@ export const HistoryPage: React.FC = () => {
                   <button
                     onClick={() => void handleDelete(item)}
                     disabled={deletingId === item.id}
-                    title="Xoá khỏi lịch sử"
-                    aria-label="Xoá khỏi lịch sử"
+                    title="Remove from history"
+                    aria-label="Remove from history"
                     className="absolute top-2 left-2 p-1.5 rounded-lg bg-black/60 text-gray-300 backdrop-blur-sm
                                opacity-100 md:opacity-0 group-hover:opacity-100 focus-visible:opacity-100
                                hover:bg-red-600 hover:text-white disabled:opacity-40 transition-all"
@@ -166,7 +166,7 @@ export const HistoryPage: React.FC = () => {
                   {item.modelLabel}
                 </p>
                 <p className="text-[10px] text-gray-600 mt-0.5">
-                  {formatDateTime(item.createdAt)} · {item.tokenCost} điểm
+                  {formatDateTime(item.createdAt)} · {item.tokenCost} credits
                 </p>
               </div>
             </Card>
@@ -181,17 +181,17 @@ export const HistoryPage: React.FC = () => {
             disabled={page === 1}
             className="px-3 py-1.5 rounded-lg bg-dark-850 text-gray-300 text-sm disabled:opacity-30 hover:bg-dark-800 transition-colors"
           >
-            ← Trước
+            ← Previous
           </button>
           <span className="text-sm text-gray-500">
-            Trang {page} / {totalPages}
+            Page {page} of {totalPages}
           </span>
           <button
             onClick={() => setPage((p) => Math.min(p + 1, totalPages))}
             disabled={page >= totalPages}
             className="px-3 py-1.5 rounded-lg bg-dark-850 text-gray-300 text-sm disabled:opacity-30 hover:bg-dark-800 transition-colors"
           >
-            Sau →
+            Next →
           </button>
         </div>
       )}
@@ -201,7 +201,7 @@ export const HistoryPage: React.FC = () => {
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 p-4"
           onClick={() => setPreviewUrl(null)}
         >
-          <img src={previewUrl} alt="Xem lớn" className="max-w-full max-h-full object-contain rounded-lg" />
+          <img src={previewUrl} alt="Full size preview" className="max-w-full max-h-full object-contain rounded-lg" />
         </div>
       )}
     </div>

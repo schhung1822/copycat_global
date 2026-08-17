@@ -24,7 +24,7 @@ export interface PlanRow extends RowDataPacket {
   code: string;
   name: string;
   months: number;
-  price_vnd: number;
+  price_usd_cents: number;
   monthly_token_allowance: number;
   description: string | null;
   is_popular: number;
@@ -39,7 +39,7 @@ export interface SubscriptionRow extends RowDataPacket {
   plan_code: string | null;
   plan_name: string;
   months: number;
-  price_vnd: number;
+  price_usd_cents: number;
   monthly_token_allowance: number;
   status: 'active' | 'expired' | 'cancelled';
   order_id: number | null;
@@ -231,7 +231,7 @@ export async function readAccountState(userId: number): Promise<AccountState> {
 export async function activateSubscription(
   conn: PoolConnection,
   userId: number,
-  plan: { id: number | null; code: string | null; name: string; months: number; priceVnd: number; allowance: number },
+  plan: { id: number | null; code: string | null; name: string; months: number; priceUsdCents: number; allowance: number },
   orderId: number | null,
   /**
    * `restart: true` dùng cho NÂNG GÓI — gói mới tính giờ từ thời điểm kích hoạt
@@ -268,9 +268,9 @@ export async function activateSubscription(
 
   const [inserted] = await conn.query<ResultSetHeader>(
     `INSERT INTO subscriptions
-       (user_id, plan_id, plan_code, plan_name, months, price_vnd, monthly_token_allowance, order_id, started_at, expires_at)
+       (user_id, plan_id, plan_code, plan_name, months, price_usd_cents, monthly_token_allowance, order_id, started_at, expires_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [userId, plan.id, plan.code, plan.name, plan.months, plan.priceVnd, plan.allowance, orderId, startedAt, expiresAt],
+    [userId, plan.id, plan.code, plan.name, plan.months, plan.priceUsdCents, plan.allowance, orderId, startedAt, expiresAt],
   );
 
   if (isRenewal) {

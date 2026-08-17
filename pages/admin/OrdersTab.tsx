@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Button } from '../../components/Button';
 import { Alert, Badge, Card, EmptyState, TableWrap, inputClass } from '../../components/ui';
 import { api, ApiError, qs } from '../../lib/api';
-import { formatDateTime, formatNumber, formatVnd, STATUS_LABEL } from '../../lib/format';
+import { formatDateTimeVi, formatNumberVi, formatUsd, STATUS_LABEL_VI } from '../../lib/format';
 import type { AdminOrder } from '../../types';
 
 const FILTERS = [
@@ -30,14 +30,14 @@ export const OrdersTab: React.FC = () => {
   }, [load]);
 
   const approve = async (order: AdminOrder) => {
-    if (!confirm(`Xác nhận đã nhận ${formatVnd(order.amountVnd)} cho đơn ${order.code} và cộng ${formatNumber(order.totalTokens)} điểm?`)) {
+    if (!confirm(`Xác nhận đã nhận ${formatUsd(order.amountUsdCents)} cho đơn ${order.code} và cộng ${formatNumberVi(order.totalTokens)} điểm?`)) {
       return;
     }
     setMessage(null);
     setBusyCode(order.code);
     try {
       await api.post(`/admin/orders/${order.code}/approve`, { note: 'Duyệt tay từ bảng điều khiển' });
-      setMessage({ tone: 'success', text: `Đã cộng ${formatNumber(order.totalTokens)} điểm cho ${order.user.email}.` });
+      setMessage({ tone: 'success', text: `Đã cộng ${formatNumberVi(order.totalTokens)} điểm cho ${order.user.email}.` });
       await load();
     } catch (err) {
       setMessage({ tone: 'error', text: err instanceof ApiError ? err.message : 'Duyệt đơn thất bại.' });
@@ -111,13 +111,13 @@ export const OrdersTab: React.FC = () => {
                     {order.user.fullName && <p className="text-[10px] text-gray-600">{order.user.fullName}</p>}
                   </td>
                   <td className="py-2.5 text-gray-400 text-xs">{order.packageName}</td>
-                  <td className="py-2.5 text-right text-gray-300">{formatVnd(order.amountVnd)}</td>
-                  <td className="py-2.5 text-right text-brand-500">{formatNumber(order.totalTokens)}</td>
+                  <td className="py-2.5 text-right text-gray-300">{formatUsd(order.amountUsdCents)}</td>
+                  <td className="py-2.5 text-right text-brand-500">{formatNumberVi(order.totalTokens)}</td>
                   <td className="py-2.5 pl-4">
-                    <Badge status={order.status}>{STATUS_LABEL[order.status]}</Badge>
+                    <Badge status={order.status}>{STATUS_LABEL_VI[order.status]}</Badge>
                     {order.paidSource && <p className="text-[10px] text-gray-600 mt-1">qua {order.paidSource}</p>}
                   </td>
-                  <td className="py-2.5 text-[11px] text-gray-500 whitespace-nowrap">{formatDateTime(order.createdAt)}</td>
+                  <td className="py-2.5 text-[11px] text-gray-500 whitespace-nowrap">{formatDateTimeVi(order.createdAt)}</td>
                   <td className="py-2.5 text-right whitespace-nowrap">
                     {order.status === 'pending' || order.status === 'expired' ? (
                       <div className="flex gap-1.5 justify-end">
@@ -138,7 +138,7 @@ export const OrdersTab: React.FC = () => {
                         )}
                       </div>
                     ) : (
-                      <span className="text-[11px] text-gray-600">{formatDateTime(order.paidAt)}</span>
+                      <span className="text-[11px] text-gray-600">{formatDateTimeVi(order.paidAt)}</span>
                     )}
                   </td>
                 </tr>
@@ -149,7 +149,8 @@ export const OrdersTab: React.FC = () => {
       </Card>
 
       <p className="text-[11px] text-gray-600">
-        Duyệt tay dùng khi khách chuyển khoản sai nội dung. Đơn đã thanh toán không thể duyệt lại nên không có rủi ro
+        Duyệt tay dùng khi khách trả tiền ngoài Stripe (thu tiền mặt, hợp đồng riêng) hoặc khi cần cứu một giao dịch
+        thất lạc. Đơn đã thanh toán không thể duyệt lại nên không có rủi ro
         cộng điểm hai lần.
       </p>
     </div>

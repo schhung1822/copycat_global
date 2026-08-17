@@ -28,11 +28,11 @@ generationRouter.post(
   asyncHandler(async (req, res) => {
     const result = await createGenerations(req.user!.id, {
       modelCode: requireString(req.body, 'modelCode', { label: 'Model' }),
-      aspectRatio: requireString(req.body, 'aspectRatio', { label: 'Tỉ lệ ảnh' }),
+      aspectRatio: requireString(req.body, 'aspectRatio', { label: 'Aspect ratio' }),
       prompt: typeof req.body.prompt === 'string' ? req.body.prompt : '',
-      referenceImages: requireStringArray(req.body, 'referenceImages', { max: 8, label: 'Ảnh mẫu' }),
-      productImages: requireStringArray(req.body, 'productImages', { max: 3, label: 'Ảnh sản phẩm' }),
-      quantityPerReference: requireInt(req.body, 'quantityPerReference', { min: 1, max: 4, label: 'Số lượng' }),
+      referenceImages: requireStringArray(req.body, 'referenceImages', { max: 8, label: 'Reference images' }),
+      productImages: requireStringArray(req.body, 'productImages', { max: 3, label: 'Product images' }),
+      quantityPerReference: requireInt(req.body, 'quantityPerReference', { min: 1, max: 4, label: 'Quantity' }),
       clientSession: optionalString(req.body, 'clientSession', 64),
     });
 
@@ -148,7 +148,7 @@ generationRouter.get(
       'SELECT * FROM generations WHERE id = ? AND user_id = ? AND deleted_at IS NULL',
       [Number(req.params.id), req.user!.id],
     );
-    if (!row) throw notFound('Không tìm thấy ảnh.');
+    if (!row) throw notFound('Image not found.');
     res.json({ generation: serializeGeneration(row) });
   }),
 );

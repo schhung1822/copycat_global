@@ -94,12 +94,12 @@ export async function spendTokens(
      */
     const breakdown =
       state.monthlyTokens > 0
-        ? ` (hạn mức tháng ${state.monthlyTokens.toLocaleString('vi-VN')} + đã mua thêm ${state.purchasedTokens.toLocaleString('vi-VN')})`
+        ? ` (${state.monthlyTokens.toLocaleString('en-US')} monthly allowance + ${state.purchasedTokens.toLocaleString('en-US')} purchased)`
         : '';
 
     throw new AppError(
       402,
-      `Không đủ điểm. Cần ${amount.toLocaleString('vi-VN')}, hiện có ${state.availableTokens.toLocaleString('vi-VN')}${breakdown}.`,
+      `Not enough credits. This needs ${amount.toLocaleString('en-US')}, you have ${state.availableTokens.toLocaleString('en-US')}${breakdown}.`,
       'insufficient_tokens',
       {
         required: amount,
@@ -236,7 +236,7 @@ export async function creditPurchasedTokens(
   if (balanceAfter < 0) {
     throw new AppError(
       402,
-      `Không đủ điểm đã mua để trừ. Hiện có ${rows[0].token_balance.toLocaleString('vi-VN')}, cần ${Math.abs(amount).toLocaleString('vi-VN')}.`,
+      `Không đủ điểm đã mua để trừ. Hiện có ${rows[0].token_balance.toLocaleString('vi-VN')}, cần ${Math.abs(amount).toLocaleString('vi-VN')}.`, // chỉ admin gặp: trừ tay quá số dư
       'insufficient_tokens',
     );
   }
